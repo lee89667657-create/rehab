@@ -1,0 +1,463 @@
+/**
+ * 운동 프로그램 페이지 - shadcn/ui 스타일
+ */
+
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import {
+  Clock,
+  Dumbbell,
+  Play,
+  Zap,
+  Target,
+  Flame,
+  Timer,
+  ChevronRight,
+  Camera,
+  TrendingUp,
+  Loader2,
+} from 'lucide-react';
+import Link from 'next/link';
+import {
+  exercisePrograms,
+  getExercisesForProgram,
+  calculateTotalDuration,
+  type ExerciseData,
+} from '@/constants/exercises';
+import AppHeader from '@/components/layout/AppHeader';
+import { useAuth } from '@/components/providers/AuthProvider';
+import { getLatestAnalysisResult, type AnalysisResultRow } from '@/lib/supabase';
+
+// shadcn/ui 컴포넌트
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+
+// ============================================================
+// 애니메이션 설정
+// ============================================================
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.1 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const },
+  },
+};
+
+// ============================================================
+// 상수 및 매핑 데이터
+// ============================================================
+
+const categoryLabels: Record<string, string> = {
+  stretching: '스트레칭',
+  strengthening: '근력 강화',
+  mobility: '가동성',
+};
+
+const issueToProgram: Record<string, string> = {
+  forward_head: 'forward_head',
+  shoulder_tilt: 'round_shoulder',
+  pelvis_tilt: 'pelvis_tilt',
+  knee_angle: 'knee_alignment',
+};
+
+// ============================================================
+// 컴포넌트: 운동 카드
+// ============================================================
+
+interface ExerciseCardProps {
+  exercise: ExerciseData;
+  index: number;
+  programId: string;
+}
+
+function ExerciseCard({ exercise, index, programId }: ExerciseCardProps) {
+  const totalTime = exercise.duration * exercise.sets;
+  const minutes = Math.floor(totalTime / 60);
+  const seconds = totalTime % 60;
+  const timeString = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+
+  return (
+    <motion.div variants={itemVariants}>
+      <Link href={`/exercise/${exercise.id}?program=${programId}&index=${index}`}>
+        <Card className="hover:shadow-lg transition-all duration-300 group">
+          <CardContent className="p-0">
+            <div className="flex items-stretch">
+              <div className="w-16 min-h-[72px] bg-primary flex items-center justify-center flex-shrink-0 rounded-l-lg">
+                <span className="text-xl font-bold text-primary-foreground">
+                  {index + 1}
+                </span>
+              </div>
+
+              <div className="flex-1 p-4 flex items-center">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">
+                    {exercise.name}
+                  </h3>
+                  <div className="flex items-center flex-wrap gap-2">
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Timer className="w-3.5 h-3.5" />
+                      {timeString}
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Flame className="w-3.5 h-3.5" />
+                      {exercise.sets}세트
+                    </span>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {categoryLabels[exercise.category]}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-lg bg-muted group-hover:bg-primary/10 flex items-center justify-center flex-shrink-0 ml-3 transition-colors">
+                  <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary" />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+    </motion.div>
+  );
+}
+
+// ============================================================
+// 컴포넌트: 분석 안내 (분석 기록 없을 때)
+// ============================================================
+
+function NoAnalysisView() {
+  return (
+    <motion.div
+      className="px-5 pt-5"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      <motion.div variants={itemVariants}>
+        <Card className="text-center">
+          <CardContent className="p-8">
+            <div className="w-20 h-20 mx-auto mb-5 bg-primary/10 rounded-2xl flex items-center justify-center">
+              <Camera className="w-10 h-10 text-primary" />
+            </div>
+
+            <h2 className="text-xl font-semibold text-foreground mb-3">
+              먼저 자세를 분석해보세요!
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+              AI가 당신의 자세를 분석하고
+              <br />
+              맞춤 운동 프로그램을 추천해드려요
+            </p>
+
+            <Button asChild size="lg" className="font-semibold">
+              <Link href="/analyze">
+                <Camera className="w-5 h-5 mr-2" />
+                자세 분석 시작하기
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div variants={itemVariants} className="mt-6 space-y-3">
+        <Card>
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
+              <TrendingUp className="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground text-sm">정확한 분석</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">AI가 자세를 정밀하게 분석해요</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+              <Target className="w-6 h-6 text-indigo-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground text-sm">맞춤 운동</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">분석 결과에 맞는 운동을 추천해요</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <Zap className="w-6 h-6 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground text-sm">효과적인 개선</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">꾸준히 하면 자세가 좋아져요</p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ============================================================
+// 컴포넌트: 운동 프로그램 뷰 (분석 기록 있을 때)
+// ============================================================
+
+interface ExerciseProgramViewProps {
+  analysisResult: AnalysisResultRow;
+}
+
+function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
+  const router = useRouter();
+
+  const { program, programExercises, primaryIssue } = useMemo(() => {
+    const scores = {
+      forward_head: analysisResult.head_forward,
+      shoulder_tilt: analysisResult.shoulder_balance,
+      pelvis_tilt: analysisResult.pelvic_tilt,
+      knee_angle: analysisResult.knee_alignment,
+    };
+
+    let lowestKey = 'forward_head';
+    let lowestScore = 100;
+    for (const [key, score] of Object.entries(scores)) {
+      if (score < lowestScore) {
+        lowestScore = score;
+        lowestKey = key;
+      }
+    }
+
+    const targetCondition = issueToProgram[lowestKey] || 'forward_head';
+    let targetProgram = exercisePrograms.find(p => p.targetCondition === targetCondition);
+    if (!targetProgram) {
+      targetProgram = exercisePrograms[0];
+    }
+
+    const exercises = getExercisesForProgram(targetProgram.id);
+    return {
+      program: targetProgram,
+      programExercises: exercises,
+      primaryIssue: lowestKey,
+    };
+  }, [analysisResult]);
+
+  const totalMinutes = calculateTotalDuration(program.exerciseIds);
+
+  const handleStartExercise = () => {
+    if (programExercises.length > 0) {
+      router.push(`/exercise/${programExercises[0].id}?program=${program.id}&index=0`);
+    }
+  };
+
+  const issueLabels: Record<string, string> = {
+    forward_head: '거북목',
+    shoulder_tilt: '어깨 불균형',
+    pelvis_tilt: '골반 틀어짐',
+    knee_angle: '무릎 정렬',
+  };
+
+  return (
+    <>
+      <motion.div
+        className="px-4 pt-5"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        {/* 분석 결과 요약 */}
+        <motion.div variants={itemVariants}>
+          <Card className="mb-4">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground">분석 결과 기반 추천</p>
+                  <p className="font-semibold text-foreground">
+                    <span className="text-primary">{issueLabels[primaryIssue]}</span> 개선 프로그램
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-primary">{analysisResult.overall_score}</p>
+                  <p className="text-xs text-muted-foreground">종합점수</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* 프로그램 헤더 카드 */}
+        <motion.section variants={itemVariants} className="mb-6">
+          <Card className="bg-primary text-primary-foreground border-0 overflow-hidden">
+            <CardContent className="p-6 relative">
+              <div className="absolute -right-16 -top-16 w-48 h-48 bg-primary-foreground/10 rounded-full blur-3xl" />
+
+              <div className="relative z-10">
+                <div className="w-12 h-12 rounded-xl bg-primary-foreground/20 flex items-center justify-center mb-4">
+                  <Dumbbell className="w-6 h-6" />
+                </div>
+
+                <h2 className="text-xl font-bold mb-2">{program.name}</h2>
+                <p className="text-primary-foreground/80 text-sm mb-4">{program.description}</p>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground border-0">
+                    <Target className="w-3 h-3 mr-1" />
+                    {programExercises.length}개 운동
+                  </Badge>
+                  <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground border-0">
+                    <Clock className="w-3 h-3 mr-1" />
+                    약 {totalMinutes}분
+                  </Badge>
+                  <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground border-0">
+                    <Zap className="w-3 h-3 mr-1" />
+                    {program.level}
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.section>
+
+        {/* 운동 리스트 */}
+        <motion.section variants={itemVariants}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-foreground">운동 순서</h3>
+            <span className="text-sm text-muted-foreground">총 {programExercises.length}개</span>
+          </div>
+
+          <div className="space-y-3">
+            {programExercises.map((exercise, index) => (
+              <ExerciseCard
+                key={exercise.id}
+                exercise={exercise}
+                index={index}
+                programId={program.id}
+              />
+            ))}
+          </div>
+        </motion.section>
+
+        {/* 팁 카드 */}
+        <motion.section variants={itemVariants} className="mt-6 mb-24">
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="p-4">
+              <p className="text-sm text-foreground">
+                <strong className="text-primary">오늘의 팁</strong>
+                <span className="mx-2">|</span>
+                운동 중 통증이 느껴지면 즉시 중단하고 휴식을 취하세요.
+              </p>
+            </CardContent>
+          </Card>
+        </motion.section>
+      </motion.div>
+
+      {/* 하단 시작 버튼 */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t">
+        <Button
+          onClick={handleStartExercise}
+          className="w-full h-12 text-base font-semibold"
+        >
+          <Play className="w-5 h-5 mr-2 fill-current" />
+          운동 시작하기
+        </Button>
+      </div>
+    </>
+  );
+}
+
+// ============================================================
+// 메인 컴포넌트: ExercisePage
+// ============================================================
+
+export default function ExercisePage() {
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResultRow | null>(null);
+
+  useEffect(() => {
+    const checkAnalysis = async () => {
+      setIsLoading(true);
+
+      try {
+        if (user) {
+          const result = await getLatestAnalysisResult(user.id);
+          if (result) {
+            setAnalysisResult(result);
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        const savedResult = localStorage.getItem('analysisResult');
+        if (savedResult) {
+          const parsed = JSON.parse(savedResult);
+          setAnalysisResult({
+            id: 'local',
+            user_id: user?.id || 'anonymous',
+            overall_score: parsed.overallScore || 75,
+            head_forward: parsed.items?.find((i: { id: string }) => i.id === 'forward_head')?.score || 80,
+            shoulder_balance: parsed.items?.find((i: { id: string }) => i.id === 'shoulder_tilt')?.score || 80,
+            pelvic_tilt: parsed.items?.find((i: { id: string }) => i.id === 'pelvis_tilt')?.score || 80,
+            knee_alignment: parsed.items?.find((i: { id: string }) => i.id === 'knee_angle')?.score || 80,
+            primary_issue: parsed.primaryIssue || null,
+            recommendations: parsed.recommendations || [],
+            pose_data: {},
+            created_at: new Date().toISOString(),
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch analysis:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAnalysis();
+  }, [user]);
+
+  return (
+    <>
+      <AppHeader />
+
+      <div className="min-h-screen bg-background pb-24 pt-14">
+        {/* 페이지 헤더 */}
+        <motion.div
+          className="bg-card px-5 py-6 border-b"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h1 className="text-2xl font-bold text-foreground">맞춤 운동</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            AI 분석 결과에 맞는 운동을 추천해드려요
+          </p>
+        </motion.div>
+
+        {/* 메인 콘텐츠 */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-10 h-10 animate-spin text-primary" />
+          </div>
+        ) : analysisResult ? (
+          <ExerciseProgramView analysisResult={analysisResult} />
+        ) : (
+          <NoAnalysisView />
+        )}
+      </div>
+    </>
+  );
+}

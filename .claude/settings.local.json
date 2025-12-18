@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@14:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(claude mcp add:*)",
+      "Bash(claude mcp list:*)",
+      "Bash(curl -s -X POST \"https://wyieldsdvwwgrmipnncx.supabase.co/auth/v1/token?grant_type=password\" )",
+      "Bash(curl -s -X POST \"https://wyieldsdvwwgrmipnncx.supabase.co/auth/v1/signup\" )",
+      "Bash(start:*)",
+      "Bash(curl:*)",
+      "Bash(node -e \"\nconst { createClient } = require(''@supabase/supabase-js'');\n\nconst supabase = createClient(\n  ''https://wyieldsdvwwgrmipnncx.supabase.co'',\n  ''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5aWVsZHNkdnd3Z3JtaXBubmN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5MzI3OTksImV4cCI6MjA4MTUwODc5OX0.mGbsEsjzyyGb8whbncXj9dOOVvUGxHxv6nl03ugEZA4''\n);\n\nasync function updateName() {\n  // 먼저 로그인\n  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({\n    email: ''Lee89667657+test2@gmail.com'',\n    password: ''dlwldus0''\n  });\n  \n  if (authError) {\n    console.log(''Login error:'', authError.message);\n    return;\n  }\n  \n  // 이름 업데이트\n  const { data, error } = await supabase.auth.updateUser({\n    data: { name: ''테스트'' }\n  });\n  \n  if (error) {\n    console.log(''Update error:'', error.message);\n  } else {\n    console.log(''Updated name:'', data.user.user_metadata.name);\n  }\n}\n\nupdateName();\n\")",
+      "Bash(node -e \"\nconst { createClient } = require(''@supabase/supabase-js'');\n\nconst supabase = createClient(\n  ''https://wyieldsdvwwgrmipnncx.supabase.co'',\n  ''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5aWVsZHNkdnd3Z3JtaXBubmN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5MzI3OTksImV4cCI6MjA4MTUwODc5OX0.mGbsEsjzyyGb8whbncXj9dOOVvUGxHxv6nl03ugEZA4''\n);\n\nasync function verify() {\n  const { data, error } = await supabase.auth.signInWithPassword({\n    email: ''Lee89667657+test2@gmail.com'',\n    password: ''dlwldus0''\n  });\n  \n  if (error) {\n    console.log(''Error:'', error.message);\n    return;\n  }\n  \n  console.log(''User name:'', data.user.user_metadata.name);\n  console.log(''Email:'', data.user.email);\n}\n\nverify();\n\")",
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)",
+      "Bash(cat:*)",
+      "Bash(timeout 8 npm run dev:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(powershell -Command \"Get-ChildItem -Path src -Recurse -Include *.tsx,*.ts | Select-String -Pattern ''[\\u{1F300}-\\u{1F9FF}]|[\\u{2600}-\\u{27BF}]'' | Select-Object -First 20\")",
+      "Bash(node -e:*)",
+      "Bash(taskkill:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
