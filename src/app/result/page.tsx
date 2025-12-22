@@ -29,9 +29,11 @@ import {
   ShieldAlert,
   Clock,
   Lightbulb,
+  Camera,
+  Bone,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useAnalysisResult } from '@/store/useStore';
+import { useAnalysisResult, useCapturedImages, useJointAngles } from '@/store/useStore';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { saveAnalysisResult, type AnalysisResultRow } from '@/lib/supabase';
 import type { AnalysisItem } from '@/lib/poseAnalysis';
@@ -55,8 +57,23 @@ import {
   type ExerciseProgram,
 } from '@/lib/exerciseRecommendation';
 
+// 고급 분석 모듈 (ROM, 비대칭 분석)
+import {
+  type JointAngles,
+  type ROMResult,
+  type AsymmetryResult,
+  analyzeAllROM,
+  analyzeAllAsymmetry,
+  calculateROMScore,
+  calculateAsymmetryScore,
+  getAsymmetrySummary,
+} from '@/lib/advancedAnalysis';
+
+// 고급 분석 리포트 컴포넌트
+import AdvancedReport from '@/components/analysis/AdvancedReport';
+
 // shadcn/ui 컴포넌트
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -557,6 +574,8 @@ export default function ResultPage() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const analysisResult = useAnalysisResult();
+  const capturedImages = useCapturedImages();
+  const storedJointAngles = useJointAngles();
 
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [expandedDiseaseId, setExpandedDiseaseId] = useState<string | null>(null);
@@ -566,6 +585,19 @@ export default function ResultPage() {
 
   const [isFromHistory, setIsFromHistory] = useState(false);
   const [historyRecord, setHistoryRecord] = useState<AnalysisResultRow | null>(null);
+  const [localHistoryRecord, setLocalHistoryRecord] = useState<{
+    id: string;
+    date: string;
+    score: number;
+    postureType?: string | null;
+    capturedImages?: {
+      front: string | null;
+      side: string | null;
+      back: string | null;
+    };
+    landmarks?: Record<string, unknown>;
+    items?: ExtendedAnalysisItem[];
+  } | null>(null);
 
   // 기록에서 온 경우 데이터 로드
   useEffect(() => {
@@ -577,8 +609,15 @@ export default function ResultPage() {
       try {
         const viewing = localStorage.getItem('viewingRecord');
         if (viewing) {
-          const record = JSON.parse(viewing) as AnalysisResultRow;
-          setHistoryRecord(record);
+          const record = JSON.parse(viewing);
+          // Supabase 기록인지 localStorage 기록인지 구분
+          if (record.created_at) {
+            // Supabase 기록
+            setHistoryRecord(record as AnalysisResultRow);
+          } else if (record.date) {
+            // localStorage 기록
+            setLocalHistoryRecord(record);
+          }
         }
       } catch (error) {
         console.error('Failed to load history record:', error);
@@ -588,49 +627,68 @@ export default function ResultPage() {
 
   // 기록에서 온 경우 변환된 결과 사용
   const historyResults: ExtendedAnalysisItem[] = useMemo(() => {
-    if (!historyRecord) return [];
-    return [
-      {
-        id: 'forward_head',
-        name: '거북목',
-        value: Math.round((100 - historyRecord.head_forward) / 10),
-        unit: 'cm',
-        grade: historyRecord.head_forward >= 80 ? 'good' : historyRecord.head_forward >= 60 ? 'warning' : 'danger',
-        score: historyRecord.head_forward,
-        description: historyRecord.head_forward >= 80 ? '정상 범위입니다' : '주의가 필요합니다',
-      },
-      {
-        id: 'shoulder_tilt',
-        name: '어깨 균형',
-        value: Math.round((100 - historyRecord.shoulder_balance) / 20),
-        unit: 'cm',
-        grade: historyRecord.shoulder_balance >= 80 ? 'good' : historyRecord.shoulder_balance >= 60 ? 'warning' : 'danger',
-        score: historyRecord.shoulder_balance,
-        description: historyRecord.shoulder_balance >= 80 ? '균형이 좋습니다' : '주의가 필요합니다',
-      },
-      {
-        id: 'pelvis_tilt',
-        name: '골반 균형',
-        value: Math.round((100 - historyRecord.pelvic_tilt) / 20),
-        unit: 'cm',
-        grade: historyRecord.pelvic_tilt >= 80 ? 'good' : historyRecord.pelvic_tilt >= 60 ? 'warning' : 'danger',
-        score: historyRecord.pelvic_tilt,
-        description: historyRecord.pelvic_tilt >= 80 ? '균형이 좋습니다' : '주의가 필요합니다',
-      },
-      {
-        id: 'knee_angle',
-        name: '무릎 정렬',
-        value: 170 + Math.round(historyRecord.knee_alignment / 10),
-        unit: '°',
-        grade: historyRecord.knee_alignment >= 80 ? 'good' : historyRecord.knee_alignment >= 60 ? 'warning' : 'danger',
-        score: historyRecord.knee_alignment,
-        description: historyRecord.knee_alignment >= 80 ? '정렬이 좋습니다' : '주의가 필요합니다',
-      },
-    ];
-  }, [historyRecord]);
+    // Supabase 기록인 경우
+    if (historyRecord) {
+      return [
+        {
+          id: 'forward_head',
+          name: '거북목',
+          value: Math.round((100 - historyRecord.head_forward) / 10),
+          unit: 'cm',
+          grade: historyRecord.head_forward >= 80 ? 'good' : historyRecord.head_forward >= 60 ? 'warning' : 'danger',
+          score: historyRecord.head_forward,
+          description: historyRecord.head_forward >= 80 ? '정상 범위입니다' : '주의가 필요합니다',
+        },
+        {
+          id: 'shoulder_tilt',
+          name: '어깨 균형',
+          value: Math.round((100 - historyRecord.shoulder_balance) / 20),
+          unit: 'cm',
+          grade: historyRecord.shoulder_balance >= 80 ? 'good' : historyRecord.shoulder_balance >= 60 ? 'warning' : 'danger',
+          score: historyRecord.shoulder_balance,
+          description: historyRecord.shoulder_balance >= 80 ? '균형이 좋습니다' : '주의가 필요합니다',
+        },
+        {
+          id: 'pelvis_tilt',
+          name: '골반 균형',
+          value: Math.round((100 - historyRecord.pelvic_tilt) / 20),
+          unit: 'cm',
+          grade: historyRecord.pelvic_tilt >= 80 ? 'good' : historyRecord.pelvic_tilt >= 60 ? 'warning' : 'danger',
+          score: historyRecord.pelvic_tilt,
+          description: historyRecord.pelvic_tilt >= 80 ? '균형이 좋습니다' : '주의가 필요합니다',
+        },
+        {
+          id: 'knee_angle',
+          name: '무릎 정렬',
+          value: 170 + Math.round(historyRecord.knee_alignment / 10),
+          unit: '°',
+          grade: historyRecord.knee_alignment >= 80 ? 'good' : historyRecord.knee_alignment >= 60 ? 'warning' : 'danger',
+          score: historyRecord.knee_alignment,
+          description: historyRecord.knee_alignment >= 80 ? '정렬이 좋습니다' : '주의가 필요합니다',
+        },
+      ];
+    }
+    // localStorage 기록인 경우
+    if (localHistoryRecord?.items) {
+      return localHistoryRecord.items as ExtendedAnalysisItem[];
+    }
+    return [];
+  }, [historyRecord, localHistoryRecord]);
 
-  const results = isFromHistory && historyRecord ? historyResults : (analysisResult?.items || DUMMY_RESULTS);
-  const overallScore = isFromHistory && historyRecord ? historyRecord.overall_score : (analysisResult?.overallScore || 72);
+  const results = isFromHistory && (historyRecord || localHistoryRecord)
+    ? historyResults
+    : (analysisResult?.items || DUMMY_RESULTS);
+  const overallScore = isFromHistory
+    ? (historyRecord?.overall_score ?? localHistoryRecord?.score ?? 72)
+    : (analysisResult?.overallScore || 72);
+
+  // 기록 조회 시 이미지는 기록에서 가져오기
+  const displayImages = useMemo(() => {
+    if (isFromHistory && localHistoryRecord?.capturedImages) {
+      return localHistoryRecord.capturedImages;
+    }
+    return capturedImages;
+  }, [isFromHistory, localHistoryRecord, capturedImages]);
 
   // 질환 위험도 분석
   const diseaseRiskAnalysis = useMemo((): DiseaseRiskAnalysis => {
@@ -641,6 +699,87 @@ export default function ResultPage() {
   const exerciseRecommendation = useMemo((): ExerciseRecommendation => {
     return recommendExercises(diseaseRiskAnalysis);
   }, [diseaseRiskAnalysis]);
+
+  // ============================================================
+  // 고급 분석 데이터 (ROM, 비대칭)
+  // ============================================================
+
+  /**
+   * 관절각 데이터
+   * 1순위: store에 저장된 실제 계산값 (analyze 페이지에서 계산)
+   * 2순위: 기존 분석 결과에서 추정값 생성 (히스토리 조회 시)
+   */
+  const jointAngles = useMemo((): JointAngles | null => {
+    // 1순위: store에 저장된 실제 관절각 데이터
+    if (storedJointAngles && !isFromHistory) {
+      return storedJointAngles;
+    }
+
+    // 2순위: localHistoryRecord에 landmarks가 있으면 계산
+    // TODO: landmarks에서 jointAngles 재계산 구현
+
+    // 3순위: 분석 결과에서 추정값 생성 (히스토리 조회 시 폴백)
+    if (results && results.length > 0) {
+      const headItem = results.find((i) => i.id === 'forward_head');
+      const shoulderItem = results.find((i) => i.id === 'shoulder_tilt');
+      const pelvisItem = results.find((i) => i.id === 'pelvis_tilt');
+      const kneeItem = results.find((i) => i.id === 'knee_angle');
+
+      // 분석 결과에서 관절각 추정
+      return {
+        trunk: headItem ? Math.min(25, Math.max(0, headItem.value * 2)) : 8,
+        hipLeft: 175 - (pelvisItem?.value || 0) * 2,
+        hipRight: 175 + (pelvisItem?.value || 0) * 2,
+        kneeLeft: kneeItem?.value || 175,
+        kneeRight: (kneeItem?.value || 175) - 2,
+        shoulderLeft: 20 + (shoulderItem?.value || 0) * 5,
+        shoulderRight: 20 - (shoulderItem?.value || 0) * 5,
+      };
+    }
+
+    return null;
+  }, [storedJointAngles, isFromHistory, results]);
+
+  /**
+   * ROM 분석 결과
+   * 관절각 데이터를 기반으로 ROM 분석을 수행합니다.
+   */
+  const romResults = useMemo((): ROMResult[] => {
+    if (!jointAngles) return [];
+    return analyzeAllROM(jointAngles);
+  }, [jointAngles]);
+
+  /**
+   * 좌우 비대칭 분석 결과
+   * 관절각 데이터를 기반으로 좌우 비대칭을 분석합니다.
+   */
+  const asymmetryResults = useMemo((): AsymmetryResult[] => {
+    if (!jointAngles) return [];
+    return analyzeAllAsymmetry(jointAngles);
+  }, [jointAngles]);
+
+  /**
+   * ROM 점수 (0~100)
+   * 정상 범위 내 관절 비율
+   */
+  const romScore = useMemo((): number => {
+    return calculateROMScore(romResults);
+  }, [romResults]);
+
+  /**
+   * 비대칭 점수 (0~100)
+   * 좌우 균형도 점수
+   */
+  const asymmetryScore = useMemo((): number => {
+    return calculateAsymmetryScore(asymmetryResults);
+  }, [asymmetryResults]);
+
+  /**
+   * 비대칭 요약 메시지
+   */
+  const asymmetrySummary = useMemo((): string => {
+    return getAsymmetrySummary(asymmetryResults);
+  }, [asymmetryResults]);
 
   // 분석 결과 저장
   useEffect(() => {
@@ -763,9 +902,9 @@ export default function ResultPage() {
 
             <div className="text-center">
               <h1 className="text-lg font-semibold text-foreground">분석 리포트</h1>
-              {isFromHistory && historyRecord && (
+              {isFromHistory && (historyRecord || localHistoryRecord) && (
                 <p className="text-xs text-muted-foreground">
-                  {new Date(historyRecord.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  {new Date(historyRecord?.created_at ?? localHistoryRecord?.date ?? '').toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
                 </p>
               )}
             </div>
@@ -782,10 +921,248 @@ export default function ResultPage() {
           initial="hidden"
           animate="visible"
         >
+          {/* ============================================================ */}
+          {/* 촬영 이미지 섹션 - 항상 표시 */}
+          {/* ============================================================ */}
+          <motion.section variants={itemVariants}>
+            <Card className="mb-4">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Camera className="w-4 h-4" />
+                  촬영 이미지
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {/* 정면 이미지 */}
+                  <div className="flex-shrink-0 text-center">
+                    <div className="w-28 h-36 bg-gray-200 rounded-lg overflow-hidden">
+                      {displayImages.front ? (
+                        <img
+                          src={displayImages.front}
+                          alt="정면"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                          이미지 없음
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">정면</p>
+                  </div>
+                  {/* 측면 이미지 */}
+                  <div className="flex-shrink-0 text-center">
+                    <div className="w-28 h-36 bg-gray-200 rounded-lg overflow-hidden">
+                      {displayImages.side ? (
+                        <img
+                          src={displayImages.side}
+                          alt="측면"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                          이미지 없음
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">측면</p>
+                  </div>
+                  {/* 후면 이미지 */}
+                  <div className="flex-shrink-0 text-center">
+                    <div className="w-28 h-36 bg-gray-200 rounded-lg overflow-hidden">
+                      {displayImages.back ? (
+                        <img
+                          src={displayImages.back}
+                          alt="후면"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                          이미지 없음
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">후면</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.section>
+
+          {/* ============================================================ */}
+          {/* 스켈레톤 정렬 분석 섹션 - 항상 표시 */}
+          {/* ============================================================ */}
+          <motion.section variants={itemVariants}>
+            <Card className="mb-4">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Bone className="w-4 h-4" />
+                  정렬 분석
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {/* 정면 스켈레톤 - 이미지 위에 오버레이 */}
+                  <div className="flex-shrink-0 text-center">
+                    <div className="relative w-36 h-48 bg-slate-900 rounded-lg overflow-hidden">
+                      {/* 배경 이미지 (있으면) */}
+                      {displayImages.front && (
+                        <img
+                          src={displayImages.front}
+                          alt="정면"
+                          className="absolute inset-0 w-full h-full object-cover opacity-30"
+                        />
+                      )}
+
+                      {/* 중앙 기준선 */}
+                      <div className="absolute left-1/2 top-2 bottom-2 w-px border-l border-dashed border-red-400 opacity-70" />
+
+                      {/* 수평 기준선 (어깨, 골반) */}
+                      <div className="absolute left-2 right-2 top-[22%] border-t border-dashed border-yellow-400 opacity-50" />
+                      <div className="absolute left-2 right-2 top-[48%] border-t border-dashed border-yellow-400 opacity-50" />
+
+                      {/* 정면 스켈레톤 SVG */}
+                      <svg className="absolute inset-0 w-full h-full">
+                        {/* 머리 */}
+                        <circle cx="50%" cy="14%" r="6" fill="#22c55e" />
+                        {/* 목 */}
+                        <line x1="50%" y1="14%" x2="50%" y2="22%" stroke="#22c55e" strokeWidth="2" />
+                        {/* 어깨 라인 */}
+                        <line x1="32%" y1="22%" x2="68%" y2="22%" stroke="#22c55e" strokeWidth="2" />
+                        <circle cx="32%" cy="22%" r="4" fill="#22c55e" />
+                        <circle cx="68%" cy="22%" r="4" fill="#22c55e" />
+                        {/* 척추 */}
+                        <line x1="50%" y1="22%" x2="50%" y2="48%" stroke="#22c55e" strokeWidth="2" />
+                        {/* 골반 라인 */}
+                        <line x1="38%" y1="48%" x2="62%" y2="48%" stroke="#22c55e" strokeWidth="2" />
+                        <circle cx="38%" cy="48%" r="4" fill="#22c55e" />
+                        <circle cx="62%" cy="48%" r="4" fill="#22c55e" />
+                        {/* 허벅지 */}
+                        <line x1="38%" y1="48%" x2="38%" y2="75%" stroke="#22c55e" strokeWidth="2" />
+                        <line x1="62%" y1="48%" x2="62%" y2="75%" stroke="#22c55e" strokeWidth="2" />
+                        <circle cx="38%" cy="75%" r="4" fill="#22c55e" />
+                        <circle cx="62%" cy="75%" r="4" fill="#22c55e" />
+                        {/* 종아리 */}
+                        <line x1="38%" y1="75%" x2="38%" y2="90%" stroke="#22c55e" strokeWidth="2" />
+                        <line x1="62%" y1="75%" x2="62%" y2="90%" stroke="#22c55e" strokeWidth="2" />
+                      </svg>
+
+                      {/* 뷰 라벨 */}
+                      <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 py-0.5 rounded">
+                        정면
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 측면 스켈레톤 */}
+                  <div className="flex-shrink-0 text-center">
+                    <div className="relative w-36 h-48 bg-slate-900 rounded-lg overflow-hidden">
+                      {/* 배경 이미지 (있으면) */}
+                      {displayImages.side && (
+                        <img
+                          src={displayImages.side}
+                          alt="측면"
+                          className="absolute inset-0 w-full h-full object-cover opacity-30"
+                        />
+                      )}
+
+                      {/* 이상적 정렬선 (수직) */}
+                      <div className="absolute left-1/2 top-2 bottom-2 w-px border-l-2 border-blue-400 opacity-70" />
+
+                      {/* 측면 스켈레톤 SVG */}
+                      <svg className="absolute inset-0 w-full h-full">
+                        {/* 머리 - 약간 앞으로 */}
+                        <circle cx="54%" cy="14%" r="6" fill="#22c55e" />
+                        {/* 목 */}
+                        <line x1="54%" y1="14%" x2="52%" y2="22%" stroke="#22c55e" strokeWidth="2" />
+                        {/* 어깨 */}
+                        <circle cx="52%" cy="22%" r="4" fill="#22c55e" />
+                        {/* 척추 - 자연스러운 S커브 */}
+                        <line x1="52%" y1="22%" x2="48%" y2="48%" stroke="#22c55e" strokeWidth="2" />
+                        {/* 골반 */}
+                        <circle cx="48%" cy="48%" r="4" fill="#22c55e" />
+                        {/* 허벅지 */}
+                        <line x1="48%" y1="48%" x2="50%" y2="75%" stroke="#22c55e" strokeWidth="2" />
+                        {/* 무릎 */}
+                        <circle cx="50%" cy="75%" r="4" fill="#22c55e" />
+                        {/* 종아리 */}
+                        <line x1="50%" y1="75%" x2="50%" y2="90%" stroke="#22c55e" strokeWidth="2" />
+                      </svg>
+
+                      {/* 뷰 라벨 */}
+                      <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 py-0.5 rounded">
+                        측면
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 범례 */}
+                <div className="flex gap-4 mt-3 text-[10px] text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                    <span>관절</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-px bg-red-400" />
+                    <span>중앙선</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-px bg-blue-400" />
+                    <span>이상 정렬</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.section>
+
+          {/* ============================================================ */}
+          {/* 고급 분석 리포트 (ROM, 비대칭) */}
+          {/* ============================================================ */}
+          {jointAngles && (
+            <motion.section variants={itemVariants} className="mb-5">
+              <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" />
+                고급 분석
+              </h2>
+              <AdvancedReport
+                jointAngles={jointAngles}
+                romResults={romResults}
+                asymmetryResults={asymmetryResults}
+              />
+              {/* ROM/비대칭 점수 요약 */}
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <Card>
+                  <CardContent className="p-3">
+                    <p className="text-xs text-muted-foreground mb-1">ROM 정상 비율</p>
+                    <p className="text-2xl font-bold text-primary">{romScore}%</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-3">
+                    <p className="text-xs text-muted-foreground mb-1">좌우 균형 점수</p>
+                    <p className="text-2xl font-bold text-primary">{asymmetryScore}점</p>
+                  </CardContent>
+                </Card>
+              </div>
+              {/* 비대칭 요약 메시지 */}
+              <Card className="mt-3 bg-muted/50">
+                <CardContent className="p-3">
+                  <p className="text-sm text-foreground">{asymmetrySummary}</p>
+                </CardContent>
+              </Card>
+            </motion.section>
+          )}
+
+          {/* ============================================================ */}
           {/* 자세 유형 분류 */}
+          {/* ============================================================ */}
           <PostureTypeCard postureType={postureType} />
 
+          {/* ============================================================ */}
           {/* 종합 점수 + 인체도 */}
+          {/* ============================================================ */}
           <motion.section variants={itemVariants} className="mb-5">
             <Card>
               <CardContent className="p-5">
@@ -869,25 +1246,9 @@ export default function ResultPage() {
             </Card>
           </motion.section>
 
-          {/* 항목별 상세 분석 */}
-          <motion.section variants={itemVariants}>
-            <h2 className="text-lg font-semibold text-foreground mb-3">
-              항목별 상세 분석
-            </h2>
-
-            <div className="space-y-3">
-              {results.map((item) => (
-                <AnalysisItemCard
-                  key={item.id}
-                  item={item}
-                  isOpen={openItemId === item.id}
-                  onToggle={() => handleToggleItem(item.id)}
-                />
-              ))}
-            </div>
-          </motion.section>
-
+          {/* ============================================================ */}
           {/* 질환 위험도 분석 섹션 */}
+          {/* ============================================================ */}
           <motion.section variants={itemVariants} className="mt-6">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
@@ -1052,6 +1413,26 @@ export default function ResultPage() {
                 </CardContent>
               </Card>
             )}
+          </motion.section>
+
+          {/* ============================================================ */}
+          {/* 항목별 상세 분석 섹션 */}
+          {/* ============================================================ */}
+          <motion.section variants={itemVariants} className="mt-6">
+            <h2 className="text-lg font-semibold text-foreground mb-3">
+              항목별 상세 분석
+            </h2>
+
+            <div className="space-y-3">
+              {results.map((item) => (
+                <AnalysisItemCard
+                  key={item.id}
+                  item={item}
+                  isOpen={openItemId === item.id}
+                  onToggle={() => handleToggleItem(item.id)}
+                />
+              ))}
+            </div>
           </motion.section>
 
           {/* 팁 카드 */}

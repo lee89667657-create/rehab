@@ -27,6 +27,9 @@ import { analyzePose } from '@/lib/poseAnalysis';
 import useStore from '@/store/useStore';
 import AppHeader from '@/components/layout/AppHeader';
 
+// 고급 분석 모듈 (관절각 계산)
+import { calculateAllJointAngles } from '@/lib/advancedAnalysis';
+
 // ============================================================
 // 타입 정의
 // ============================================================
@@ -288,6 +291,8 @@ import type { CaptureFrameFunction } from '@/components/pose/PoseCamera';
 export default function AnalyzePage() {
   const router = useRouter();
   const setAnalysisResult = useStore((state) => state.setAnalysisResult);
+  const setCapturedImage = useStore((state) => state.setCapturedImage);
+  const setJointAngles = useStore((state) => state.setJointAngles);
 
   const [currentModeIndex, setCurrentModeIndex] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -341,6 +346,11 @@ export default function AnalyzePage() {
       timestamp: Date.now(),
     };
 
+    // Zustand store에 캡처된 이미지 저장
+    if (capturedImage) {
+      setCapturedImage(currentMode.mode, capturedImage);
+    }
+
     const updatedData = [...capturedData, newCapture];
     setCapturedData(updatedData);
     setCountdown(null);
@@ -363,23 +373,94 @@ export default function AnalyzePage() {
         const result = analyzePose(poseLandmarks);
         setAnalysisResult(result);
 
+        // ============================================================
+        // 관절각 계산 및 저장 (고급 분석용)
+        // ============================================================
+        // MediaPipe landmarks를 Point3D 형식으로 변환하여 관절각 계산
+        // 참고: world_landmarks가 있으면 더 정확하지만, 현재는 normalized landmarks 사용
+        try {
+          const point3DLandmarks = frontData.landmarks.map(lm => ({
+            x: lm.x,
+            y: lm.y,
+            z: lm.z,
+            visibility: lm.visibility,
+          }));
+          const calculatedAngles = calculateAllJointAngles(point3DLandmarks);
+          setJointAngles(calculatedAngles);
+        } catch (error) {
+          console.error('관절각 계산 실패:', error);
+        }
+
         // 이미지 데이터도 함께 저장
-        const capturedImages = {
+        const capturedImagesData = {
           front: updatedData.find(d => d.mode === 'front')?.image || null,
           side: updatedData.find(d => d.mode === 'side')?.image || null,
           back: updatedData.find(d => d.mode === 'back')?.image || null,
         };
 
+        // ============================================================
+        // 분석 기록 저장 (히스토리용)
+        // ============================================================
+        // 자세 유형 계산
+        const headItem = result.items.find(i => i.id === 'forward_head');
+        const shoulderItem = result.items.find(i => i.id === 'shoulder_tilt');
+        const kneeItem = result.items.find(i => i.id === 'knee_angle');
+        let postureType = '정상 자세';
+        if (headItem && headItem.value > 3) postureType = '거북목 자세';
+        else if (shoulderItem && shoulderItem.value > 2) postureType = '불균형 자세';
+        else if (kneeItem && kneeItem.value < 170) postureType = 'O다리 경향';
+
+        // ============================================================
+        // 각 촬영 뷰별 랜드마크 추출 (스켈레톤 렌더링용)
+        // ============================================================
+        // 정면, 측면, 후면 촬영 시 저장된 랜드마크를 뷰별로 분리
+        const landmarksByView = {
+          front: updatedData.find(d => d.mode === 'front')?.landmarks || null,
+          side: updatedData.find(d => d.mode === 'side')?.landmarks || null,
+          back: updatedData.find(d => d.mode === 'back')?.landmarks || null,
+        };
+
+        const analysisRecord = {
+          id: Date.now().toString(),
+          date: new Date().toISOString(),
+          score: result.overallScore,
+          postureType: postureType,
+
+          // 촬영 이미지 저장 (base64)
+          capturedImages: capturedImagesData,
+
+          // 관절 좌표 저장 (스켈레톤용) - 뷰별로 분리
+          landmarks: landmarksByView,
+
+          // 기존 호환성을 위한 정면 랜드마크 (단일 배열)
+          poseLandmarks: poseLandmarks,
+
+          // 분석 항목 결과
+          items: result.items,
+        };
+
+        // 히스토리에 저장 (최대 30개)
+        try {
+          const history = JSON.parse(localStorage.getItem('analysisHistory') || '[]');
+          history.unshift(analysisRecord);
+          if (history.length > 30) history.pop();
+          localStorage.setItem('analysisHistory', JSON.stringify(history));
+        } catch (e) {
+          console.error('히스토리 저장 실패:', e);
+        }
+
+        // 현재 결과 저장
         localStorage.setItem('poseData', JSON.stringify(updatedData));
         localStorage.setItem('analysisResult', JSON.stringify(result));
-        localStorage.setItem('capturedImages', JSON.stringify(capturedImages));
+        localStorage.setItem('capturedImages', JSON.stringify(capturedImagesData));
+        localStorage.setItem('currentRecord', JSON.stringify(analysisRecord));
       }
 
       setTimeout(() => {
         router.push('/result');
       }, 500);
     }
-  }, [currentMode.mode, capturedData, currentModeIndex, setAnalysisResult, router]);
+  }, [currentMode.mode, capturedData, currentModeIndex, setAnalysisResult, setJointAngles, setCapturedImage, router]);
 
   // 촬영 시작 (3초 카운트다운)
   const handleCaptureStart = () => {

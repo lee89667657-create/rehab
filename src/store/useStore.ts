@@ -29,6 +29,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AnalysisResult } from '@/lib/poseAnalysis';
+import type { JointAngles } from '@/lib/advancedAnalysis';
 
 /**
  * 촬영 이미지 타입
@@ -84,6 +85,27 @@ interface AppState {
    * 새로운 분석을 시작할 때 호출합니다.
    */
   clearAnalysisResult: () => void;
+
+  // ========================================
+  // 관절각 데이터 (고급 분석용)
+  // ========================================
+
+  /**
+   * 관절각 데이터 (ROM, 비대칭 분석용)
+   * MediaPipe world_landmarks에서 계산된 3D 관절각입니다.
+   */
+  jointAngles: JointAngles | null;
+
+  /**
+   * 관절각 데이터 저장
+   * @param angles - 계산된 관절각 객체
+   */
+  setJointAngles: (angles: JointAngles) => void;
+
+  /**
+   * 관절각 데이터 초기화
+   */
+  clearJointAngles: () => void;
 
   // ========================================
   // 촬영 이미지
@@ -228,6 +250,25 @@ const useStore = create<AppState>()(
         }),
 
       // ========================================
+      // 관절각 데이터 (고급 분석용)
+      // ========================================
+
+      /** 초기 관절각 데이터: null (분석 전) */
+      jointAngles: null,
+
+      /** 관절각 데이터 저장 */
+      setJointAngles: (angles) =>
+        set({
+          jointAngles: angles,
+        }),
+
+      /** 관절각 데이터 초기화 */
+      clearJointAngles: () =>
+        set({
+          jointAngles: null,
+        }),
+
+      // ========================================
       // 촬영 이미지
       // ========================================
 
@@ -313,6 +354,7 @@ const useStore = create<AppState>()(
         set({
           userName: '사용자',
           analysisResult: null,
+          jointAngles: null,
           capturedImages: initialCapturedImages,
           currentExerciseIndex: 0,
           currentSet: 1,
@@ -355,6 +397,9 @@ export const useUserName = () => useStore((state) => state.userName);
 
 /** 분석 결과 셀렉터 */
 export const useAnalysisResult = () => useStore((state) => state.analysisResult);
+
+/** 관절각 데이터 셀렉터 */
+export const useJointAngles = () => useStore((state) => state.jointAngles);
 
 /** 촬영 이미지 셀렉터 */
 export const useCapturedImages = () => useStore((state) => state.capturedImages);
