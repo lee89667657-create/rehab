@@ -1,5 +1,8 @@
 /**
  * 기록 페이지 - shadcn/ui 스타일
+ *
+ * Supabase 기록과 localStorage 기록을 함께 표시합니다.
+ * 각 기록 카드에 촬영 이미지 썸네일을 표시합니다.
  */
 
 'use client';
@@ -7,7 +10,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Calendar, TrendingUp, ChevronRight, Trash2, Loader2, User, BarChart3 } from 'lucide-react';
+import { Calendar, TrendingUp, ChevronRight, Trash2, Loader2, User, BarChart3, ImageIcon } from 'lucide-react';
 import AppHeader from '@/components/layout/AppHeader';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getAnalysisHistory, deleteAnalysisResult, type AnalysisResultRow } from '@/lib/supabase';
@@ -17,6 +20,29 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+
+// ============================================================
+// localStorage 기록 타입 정의
+// ============================================================
+
+interface LocalAnalysisRecord {
+  id: string;
+  date: string;
+  score: number;
+  postureType?: string | null;
+  capturedImages?: {
+    front: string | null;
+    side: string | null;
+    back: string | null;
+  };
+  landmarks?: Record<string, unknown>;
+  items?: Array<{
+    id: string;
+    name: string;
+    score: number;
+    grade: string;
+  }>;
+}
 
 // ============================================================
 // 애니메이션 설정
@@ -46,18 +72,31 @@ const itemVariants = {
 export default function HistoryPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [records, setRecords] = useState<AnalysisResultRow[]>([]);
+  const [supabaseRecords, setSupabaseRecords] = useState<AnalysisResultRow[]>([]);
+  const [localRecords, setLocalRecords] = useState<LocalAnalysisRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // 기록 상세 보기
-  const handleViewRecord = (record: AnalysisResultRow) => {
+  // ============================================================
+  // Supabase 기록 상세 보기
+  // ============================================================
+  const handleViewSupabaseRecord = (record: AnalysisResultRow) => {
     localStorage.setItem('viewingRecord', JSON.stringify(record));
     router.push('/result?from=history');
   };
 
-  // 기록 삭제
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
+  // ============================================================
+  // localStorage 기록 상세 보기
+  // ============================================================
+  const handleViewLocalRecord = (record: LocalAnalysisRecord) => {
+    localStorage.setItem('viewingRecord', JSON.stringify(record));
+    router.push('/result?from=history');
+  };
+
+  // ============================================================
+  // Supabase 기록 삭제
+  // ============================================================
+  const handleDeleteSupabase = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
 
     if (!confirm('이 기록을 삭제하시겠습니까?')) return;
@@ -65,7 +104,7 @@ export default function HistoryPage() {
     setDeletingId(id);
     try {
       await deleteAnalysisResult(id);
-      setRecords((prev) => prev.filter((r) => r.id !== id));
+      setSupabaseRecords((prev) => prev.filter((r) => r.id !== id));
     } catch (error) {
       console.error('Failed to delete record:', error);
       alert('삭제에 실패했습니다. 다시 시도해주세요.');
@@ -74,26 +113,59 @@ export default function HistoryPage() {
     }
   };
 
-  // 분석 기록 불러오기
+  // ============================================================
+  // localStorage 기록 삭제
+  // ============================================================
+  const handleDeleteLocal = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+
+    if (!confirm('이 기록을 삭제하시겠습니까?')) return;
+
+    setDeletingId(id);
+    try {
+      const history = JSON.parse(localStorage.getItem('analysisHistory') || '[]');
+      const filtered = history.filter((r: LocalAnalysisRecord) => r.id !== id);
+      localStorage.setItem('analysisHistory', JSON.stringify(filtered));
+      setLocalRecords(filtered);
+    } catch (error) {
+      console.error('Failed to delete local record:', error);
+      alert('삭제에 실패했습니다.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // ============================================================
+  // 분석 기록 불러오기 (Supabase + localStorage)
+  // ============================================================
   useEffect(() => {
     const fetchRecords = async () => {
-      if (!user) {
-        setIsLoading(false);
-        return;
+      // localStorage 기록 불러오기 (항상 수행)
+      try {
+        const localHistory = JSON.parse(localStorage.getItem('analysisHistory') || '[]');
+        setLocalRecords(localHistory);
+      } catch (e) {
+        console.error('Failed to load local history:', e);
       }
 
-      try {
-        const data = await getAnalysisHistory(user.id);
-        setRecords(data || []);
-      } catch (error) {
-        console.error('Failed to fetch history:', error);
-      } finally {
-        setIsLoading(false);
+      // Supabase 기록 불러오기 (로그인한 경우만)
+      if (user) {
+        try {
+          const data = await getAnalysisHistory(user.id);
+          setSupabaseRecords(data || []);
+        } catch (error) {
+          console.error('Failed to fetch history:', error);
+        }
       }
+
+      setIsLoading(false);
     };
 
     fetchRecords();
   }, [user]);
+
+  // 전체 기록 수
+  const totalRecords = supabaseRecords.length + localRecords.length;
 
   // 날짜 포맷팅
   const formatDate = (dateString: string) => {
@@ -154,13 +226,93 @@ export default function HistoryPage() {
                 </Card>
               ))}
             </div>
-          ) : records.length > 0 ? (
+          ) : totalRecords > 0 ? (
             /* 기록이 있을 때 */
             <div className="space-y-4">
-              {records.map((record) => (
-                <motion.div key={record.id} variants={itemVariants}>
+              {/* ============================================================ */}
+              {/* localStorage 기록 (최근 분석) */}
+              {/* ============================================================ */}
+              {localRecords.map((record) => (
+                <motion.div key={`local-${record.id}`} variants={itemVariants}>
                   <Card
-                    onClick={() => handleViewRecord(record)}
+                    onClick={() => handleViewLocalRecord(record)}
+                    className="cursor-pointer hover:shadow-lg transition-all duration-300 group"
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-4">
+                        {/* 썸네일 - 촬영 이미지 표시 */}
+                        <div className="w-16 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                          {record.capturedImages?.front ? (
+                            <img
+                              src={record.capturedImages.front}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                              <ImageIcon className="w-6 h-6" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 정보 */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {formatDate(record.date)}
+                          </div>
+
+                          <div className="flex items-baseline gap-2 mb-1">
+                            <span className="text-2xl font-bold text-foreground">
+                              {record.score}
+                            </span>
+                            <span className="text-sm text-muted-foreground">점</span>
+                            <Badge variant={getScoreBadgeVariant(record.score)} className="text-[10px]">
+                              {record.score >= 80 ? '양호' : record.score >= 60 ? '주의' : '경고'}
+                            </Badge>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                            <span className="text-xs text-muted-foreground">
+                              {record.postureType || '자세 분석'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 오른쪽 액션 */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => handleDeleteLocal(e, record.id)}
+                            disabled={deletingId === record.id}
+                            className="h-9 w-9 hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            {deletingId === record.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </Button>
+
+                          <div className="w-9 h-9 rounded-lg bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                            <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary" />
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+
+              {/* ============================================================ */}
+              {/* Supabase 기록 (클라우드 동기화) */}
+              {/* ============================================================ */}
+              {supabaseRecords.map((record) => (
+                <motion.div key={`supabase-${record.id}`} variants={itemVariants}>
+                  <Card
+                    onClick={() => handleViewSupabaseRecord(record)}
                     className="cursor-pointer hover:shadow-lg transition-all duration-300 group"
                   >
                     <CardContent className="p-4">
@@ -211,7 +363,7 @@ export default function HistoryPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={(e) => handleDelete(e, record.id)}
+                            onClick={(e) => handleDeleteSupabase(e, record.id)}
                             disabled={deletingId === record.id}
                             className="h-9 w-9 hover:bg-destructive/10 hover:text-destructive"
                           >
