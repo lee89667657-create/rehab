@@ -31,9 +31,10 @@ import {
   Lightbulb,
   Camera,
   Bone,
+  Box,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useAnalysisResult, useCapturedImages, useJointAngles } from '@/store/useStore';
+import { useAnalysisResult, useCapturedImages, useJointAngles, useLandmarks } from '@/store/useStore';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { saveAnalysisResult, type AnalysisResultRow } from '@/lib/supabase';
 import type { AnalysisItem } from '@/lib/poseAnalysis';
@@ -71,6 +72,11 @@ import {
 
 // 고급 분석 리포트 컴포넌트
 import AdvancedReport from '@/components/analysis/AdvancedReport';
+
+// 3D 스켈레톤 시각화 컴포넌트 (OpenCap Kinematic 스타일)
+import Skeleton3D from '@/components/analysis/Skeleton3D';
+// 3D 모델 스켈레톤 (ReadyPlayerMe GLTF)
+import Skeleton3DModel from '@/components/analysis/Skeleton3DModel';
 
 // shadcn/ui 컴포넌트
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -124,6 +130,93 @@ const itemDetails: Record<string, { detail: string; recommendation: string; body
     normalRange: '170° ~ 180°',
   },
 };
+
+// ============================================================
+// 테스트용 더미 랜드마크 데이터 (33개 관절)
+// MediaPipe Pose 형식 (normalized coordinates: 0~1 범위)
+// ============================================================
+const DUMMY_LANDMARKS: Array<{ x: number; y: number; z: number; visibility: number }> = [
+  // 0: 코 (nose)
+  { x: 0.50, y: 0.15, z: -0.05, visibility: 0.99 },
+  // 1: 왼쪽 눈 안쪽 (left eye inner)
+  { x: 0.48, y: 0.13, z: -0.04, visibility: 0.98 },
+  // 2: 왼쪽 눈 (left eye)
+  { x: 0.46, y: 0.13, z: -0.03, visibility: 0.98 },
+  // 3: 왼쪽 눈 바깥쪽 (left eye outer)
+  { x: 0.44, y: 0.13, z: -0.02, visibility: 0.97 },
+  // 4: 오른쪽 눈 안쪽 (right eye inner)
+  { x: 0.52, y: 0.13, z: -0.04, visibility: 0.98 },
+  // 5: 오른쪽 눈 (right eye)
+  { x: 0.54, y: 0.13, z: -0.03, visibility: 0.98 },
+  // 6: 오른쪽 눈 바깥쪽 (right eye outer)
+  { x: 0.56, y: 0.13, z: -0.02, visibility: 0.97 },
+  // 7: 왼쪽 귀 (left ear)
+  { x: 0.40, y: 0.14, z: 0.02, visibility: 0.90 },
+  // 8: 오른쪽 귀 (right ear)
+  { x: 0.60, y: 0.14, z: 0.02, visibility: 0.90 },
+  // 9: 입 왼쪽 (mouth left)
+  { x: 0.47, y: 0.19, z: -0.03, visibility: 0.95 },
+  // 10: 입 오른쪽 (mouth right)
+  { x: 0.53, y: 0.19, z: -0.03, visibility: 0.95 },
+  // 11: 왼쪽 어깨 (left shoulder)
+  { x: 0.35, y: 0.28, z: 0.00, visibility: 0.99 },
+  // 12: 오른쪽 어깨 (right shoulder)
+  { x: 0.65, y: 0.28, z: 0.00, visibility: 0.99 },
+  // 13: 왼쪽 팔꿈치 (left elbow)
+  { x: 0.28, y: 0.42, z: 0.02, visibility: 0.95 },
+  // 14: 오른쪽 팔꿈치 (right elbow)
+  { x: 0.72, y: 0.42, z: 0.02, visibility: 0.95 },
+  // 15: 왼쪽 손목 (left wrist)
+  { x: 0.25, y: 0.55, z: 0.05, visibility: 0.90 },
+  // 16: 오른쪽 손목 (right wrist)
+  { x: 0.75, y: 0.55, z: 0.05, visibility: 0.90 },
+  // 17: 왼쪽 새끼손가락 (left pinky)
+  { x: 0.23, y: 0.58, z: 0.06, visibility: 0.85 },
+  // 18: 오른쪽 새끼손가락 (right pinky)
+  { x: 0.77, y: 0.58, z: 0.06, visibility: 0.85 },
+  // 19: 왼쪽 검지 (left index)
+  { x: 0.24, y: 0.59, z: 0.04, visibility: 0.85 },
+  // 20: 오른쪽 검지 (right index)
+  { x: 0.76, y: 0.59, z: 0.04, visibility: 0.85 },
+  // 21: 왼쪽 엄지 (left thumb)
+  { x: 0.26, y: 0.57, z: 0.03, visibility: 0.85 },
+  // 22: 오른쪽 엄지 (right thumb)
+  { x: 0.74, y: 0.57, z: 0.03, visibility: 0.85 },
+  // 23: 왼쪽 골반 (left hip)
+  { x: 0.40, y: 0.52, z: 0.00, visibility: 0.99 },
+  // 24: 오른쪽 골반 (right hip)
+  { x: 0.60, y: 0.52, z: 0.00, visibility: 0.99 },
+  // 25: 왼쪽 무릎 (left knee)
+  { x: 0.38, y: 0.72, z: 0.02, visibility: 0.95 },
+  // 26: 오른쪽 무릎 (right knee)
+  { x: 0.62, y: 0.72, z: 0.02, visibility: 0.95 },
+  // 27: 왼쪽 발목 (left ankle)
+  { x: 0.37, y: 0.92, z: 0.00, visibility: 0.90 },
+  // 28: 오른쪽 발목 (right ankle)
+  { x: 0.63, y: 0.92, z: 0.00, visibility: 0.90 },
+  // 29: 왼쪽 뒤꿈치 (left heel)
+  { x: 0.36, y: 0.95, z: 0.02, visibility: 0.85 },
+  // 30: 오른쪽 뒤꿈치 (right heel)
+  { x: 0.64, y: 0.95, z: 0.02, visibility: 0.85 },
+  // 31: 왼쪽 발끝 (left foot index)
+  { x: 0.35, y: 0.97, z: -0.03, visibility: 0.85 },
+  // 32: 오른쪽 발끝 (right foot index)
+  { x: 0.65, y: 0.97, z: -0.03, visibility: 0.85 },
+];
+
+// 측면 뷰용 더미 랜드마크 (약간 다른 z값으로 깊이감 표현)
+const DUMMY_LANDMARKS_SIDE: Array<{ x: number; y: number; z: number; visibility: number }> =
+  DUMMY_LANDMARKS.map((lm, idx) => {
+    // 측면에서는 x 좌표를 조정하여 측면 실루엣 표현
+    // 머리가 살짝 앞으로 나온 자세 (거북목 경향)
+    const forwardOffset = idx <= 10 ? 0.03 : 0; // 머리 부분만 앞으로
+    return {
+      ...lm,
+      x: 0.5 + (lm.z * 2) + forwardOffset, // z를 x로 변환하여 측면 표현
+      z: -(lm.x - 0.5) * 0.5, // 원래 x를 z로 변환
+      visibility: lm.visibility * 0.9, // 측면은 가시성 약간 낮음
+    };
+  });
 
 const DUMMY_RESULTS: ExtendedAnalysisItem[] = [
   {
@@ -576,9 +669,14 @@ export default function ResultPage() {
   const analysisResult = useAnalysisResult();
   const capturedImages = useCapturedImages();
   const storedJointAngles = useJointAngles();
+  const storedLandmarks = useLandmarks();
 
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [expandedDiseaseId, setExpandedDiseaseId] = useState<string | null>(null);
+  // 3D 스켈레톤 뷰 전환 상태 ('front' | 'side' | 'back')
+  const [skeleton3DView, setSkeleton3DView] = useState<'front' | 'side' | 'back'>('front');
+  // 3D 모델 모드 토글 (true: GLTF 모델, false: 스틱 피겨)
+  const [use3DModel, setUse3DModel] = useState<boolean>(true);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const hasSavedRef = useRef(false);
@@ -689,6 +787,116 @@ export default function ResultPage() {
     }
     return capturedImages;
   }, [isFromHistory, localHistoryRecord, capturedImages]);
+
+  // 3D 스켈레톤용 랜드마크 데이터
+  // ============================================================
+  // 랜드마크 데이터 소스 결정
+  // ============================================================
+  // 우선순위:
+  // 1. 히스토리에서 온 경우: localHistoryRecord.landmarks 사용
+  // 2. 새 분석인 경우: store의 storedLandmarks 사용
+  // 3. 데이터 없는 경우: 테스트용 더미 데이터 사용
+
+  // 데이터 소스 타입 (UI 표시용)
+  type LandmarkSource = 'history' | 'realtime' | 'demo';
+
+  const { displayLandmarks, landmarkSource } = useMemo(() => {
+    // 1. 히스토리에서 온 경우
+    if (isFromHistory && localHistoryRecord?.landmarks) {
+      const lm = localHistoryRecord.landmarks as {
+        front?: Array<{ x: number; y: number; z: number; visibility: number }> | null;
+        side?: Array<{ x: number; y: number; z: number; visibility: number }> | null;
+        back?: Array<{ x: number; y: number; z: number; visibility: number }> | null;
+      };
+
+      // 디버깅 로그
+      console.log('[Skeleton3D] Data source: HISTORY');
+      console.log('[Skeleton3D] Front landmarks:', lm.front?.length || 0, 'points');
+      console.log('[Skeleton3D] Side landmarks:', lm.side?.length || 0, 'points');
+      console.log('[Skeleton3D] Back landmarks:', lm.back?.length || 0, 'points');
+
+      return {
+        displayLandmarks: {
+          front: lm.front || null,
+          side: lm.side || null,
+          back: lm.back || null,
+        },
+        landmarkSource: 'history' as LandmarkSource,
+      };
+    }
+
+    // 2. store에 저장된 랜드마크가 있는 경우 (실시간 촬영 데이터)
+    if (storedLandmarks.front || storedLandmarks.side || storedLandmarks.back) {
+      // ============================================================
+      // 랜드마크 검증 및 디버깅 로그
+      // ============================================================
+      console.log('========================================');
+      console.log('[Result] 랜드마크 검증 시작');
+      console.log('[Result] Data source: REALTIME (from camera capture)');
+      console.log('========================================');
+
+      // 각 뷰별 검증
+      const validateLandmarks = (
+        landmarks: typeof storedLandmarks.front,
+        viewName: string
+      ) => {
+        if (!landmarks) {
+          console.log(`[Result] ${viewName}: 없음`);
+          return false;
+        }
+
+        const count = landmarks.length;
+        const isValid = count === 33;
+
+        console.log(`[Result] ${viewName}: ${count}개 ${isValid ? '(OK)' : '(INVALID - expected 33)'}`);
+
+        if (landmarks[0]) {
+          console.log(`[Result] ${viewName} 샘플 (index 0):`, {
+            x: landmarks[0].x?.toFixed(4) ?? 'undefined',
+            y: landmarks[0].y?.toFixed(4) ?? 'undefined',
+            z: landmarks[0].z?.toFixed(4) ?? 'undefined',
+            visibility: landmarks[0].visibility?.toFixed(2) ?? 'undefined',
+          });
+        }
+
+        // 좌표 타입 확인
+        if (landmarks[11]) {
+          const sampleX = landmarks[11].x;
+          if (sampleX >= 0 && sampleX <= 1) {
+            console.log(`[Result] ${viewName} 좌표 타입: NORMALIZED (0~1)`);
+          } else {
+            console.log(`[Result] ${viewName} 좌표 타입: WORLD (미터 단위)`);
+          }
+        }
+
+        return isValid;
+      };
+
+      validateLandmarks(storedLandmarks.front, 'Front');
+      validateLandmarks(storedLandmarks.side, 'Side');
+      validateLandmarks(storedLandmarks.back, 'Back');
+
+      console.log('========================================');
+
+      return {
+        displayLandmarks: storedLandmarks,
+        landmarkSource: 'realtime' as LandmarkSource,
+      };
+    }
+
+    // 3. 데이터가 없는 경우 테스트용 더미 데이터 반환
+    console.log('[Skeleton3D] Data source: DEMO (no real data available)');
+    console.log('[Skeleton3D] Using dummy landmarks for visualization');
+
+    return {
+      displayLandmarks: {
+        front: DUMMY_LANDMARKS,
+        side: DUMMY_LANDMARKS_SIDE,
+        back: DUMMY_LANDMARKS, // 후면은 정면과 동일하게 사용
+      },
+      landmarkSource: 'demo' as LandmarkSource,
+    };
+  }, [isFromHistory, localHistoryRecord, storedLandmarks]);
 
   // 질환 위험도 분석
   const diseaseRiskAnalysis = useMemo((): DiseaseRiskAnalysis => {
@@ -1111,6 +1319,105 @@ export default function ResultPage() {
                   <div className="flex items-center gap-1">
                     <div className="w-3 h-px bg-blue-400" />
                     <span>이상 정렬</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.section>
+
+          {/* ============================================================ */}
+          {/* 3D Postural Analysis (깔끔한 단일 UI) */}
+          {/* ============================================================ */}
+          <motion.section variants={itemVariants}>
+            <Card className="mb-4">
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Box className="w-4 h-4" />
+                      Postural Analysis
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Postural alignment relative to global reference frame
+                    </p>
+                  </div>
+                  {/* 모델 타입 토글 */}
+                  <button
+                    onClick={() => setUse3DModel(!use3DModel)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      use3DModel
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    {use3DModel ? '3D Model' : 'Skeleton'}
+                  </button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* 뷰 버튼 - 1세트만 */}
+                <div className="flex justify-center mb-4">
+                  <div className="flex gap-1 bg-muted p-1 rounded-lg">
+                    {(['front', 'side', 'back'] as const).map((view) => (
+                      <button
+                        key={view}
+                        onClick={() => setSkeleton3DView(view)}
+                        disabled={!displayLandmarks[view]}
+                        className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          skeleton3DView === view
+                            ? 'bg-primary text-primary-foreground'
+                            : displayLandmarks[view]
+                              ? 'text-muted-foreground hover:text-foreground hover:bg-muted/80'
+                              : 'text-muted-foreground/40 cursor-not-allowed'
+                        }`}
+                      >
+                        {view.charAt(0).toUpperCase() + view.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3D 스켈레톤 / 모델 */}
+                <div className="flex justify-center">
+                  {displayLandmarks[skeleton3DView] ? (
+                    use3DModel ? (
+                      <Skeleton3DModel
+                        landmarks={displayLandmarks[skeleton3DView]}
+                        viewMode={skeleton3DView}
+                        width={400}
+                        height={480}
+                      />
+                    ) : (
+                      <Skeleton3D
+                        landmarks={displayLandmarks[skeleton3DView]}
+                        viewMode={skeleton3DView}
+                        width={400}
+                        height={480}
+                      />
+                    )
+                  ) : (
+                    <div className="w-[400px] h-[480px] bg-[#0d1117] rounded-lg flex items-center justify-center">
+                      <div className="text-center text-[#8b949e]">
+                        <p className="text-sm font-medium">No data for {skeleton3DView} view</p>
+                        <p className="text-xs mt-1">Capture this angle first</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 범례 */}
+                <div className="flex justify-center gap-6 mt-4 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-0.5 bg-[#60a5fa]"></div>
+                    <span>Vertical ref</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-0.5 bg-[#4ade80]"></div>
+                    <span>Shoulder line</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-0.5 bg-[#fbbf24]"></div>
+                    <span>Pelvis line</span>
                   </div>
                 </div>
               </CardContent>
