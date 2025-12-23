@@ -544,9 +544,13 @@ export default function Skeleton3DModel({
         controls.enableDamping = true
         controls.dampingFactor = 0.05
         controls.enableZoom = true
-        controls.enableRotate = false
+        controls.enableRotate = true
         controls.enablePan = false
         controls.target.set(0, 1.0, 0)
+        controls.minDistance = 1.5
+        controls.maxDistance = 6
+        controls.minPolarAngle = 0.5
+        controls.maxPolarAngle = 2.5
         controlsRef.current = controls
 
         // Animation loop
