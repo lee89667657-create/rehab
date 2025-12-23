@@ -27,6 +27,7 @@ import {
   calculateTotalDuration,
   type ExerciseData,
 } from '@/constants/exercises';
+import { COUNTABLE_EXERCISES, type CountableExercise } from '@/lib/exerciseData';
 import AppHeader from '@/components/layout/AppHeader';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getLatestAnalysisResult, type AnalysisResultRow } from '@/lib/supabase';
@@ -134,13 +135,69 @@ function ExerciseCard({ exercise, index, programId }: ExerciseCardProps) {
 }
 
 // ============================================================
+// 컴포넌트: 실시간 분석 운동 카드
+// ============================================================
+
+interface RealtimeExerciseCardProps {
+  exercise: CountableExercise;
+}
+
+function RealtimeExerciseCard({ exercise }: RealtimeExerciseCardProps) {
+  return (
+    <motion.div variants={itemVariants}>
+      <Link href={`/exercise/realtime/${exercise.id}`}>
+        <Card className="hover:shadow-lg transition-all duration-300 group border-green-200 dark:border-green-800">
+          <CardContent className="p-0">
+            <div className="flex items-stretch">
+              {/* 왼쪽 아이콘 영역 - 카메라 표시 */}
+              <div className="w-16 min-h-[72px] bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center flex-shrink-0 rounded-l-lg">
+                <Camera className="w-6 h-6 text-white" />
+              </div>
+
+              <div className="flex-1 p-4 flex items-center">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-foreground group-hover:text-green-600 transition-colors">
+                      {exercise.name}
+                    </h3>
+                    <Badge variant="outline" className="text-[10px] border-green-500 text-green-600">
+                      실시간 분석
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-1.5 line-clamp-1">
+                    {exercise.description}
+                  </p>
+                  <div className="flex items-center flex-wrap gap-2">
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Target className="w-3.5 h-3.5" />
+                      {exercise.sets}세트 x {exercise.reps}회
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Zap className="w-3.5 h-3.5" />
+                      {exercise.targetDisease}
+                    </span>
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 group-hover:bg-green-200 dark:group-hover:bg-green-800/50 flex items-center justify-center flex-shrink-0 ml-3 transition-colors">
+                  <ChevronRight className="w-5 h-5 text-green-600" />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+    </motion.div>
+  );
+}
+
+// ============================================================
 // 컴포넌트: 분석 안내 (분석 기록 없을 때)
 // ============================================================
 
 function NoAnalysisView() {
   return (
     <motion.div
-      className="px-5 pt-5"
+      className="px-5 pt-5 pb-24"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
@@ -169,6 +226,25 @@ function NoAnalysisView() {
             </Button>
           </CardContent>
         </Card>
+      </motion.div>
+
+      {/* 실시간 분석 운동 섹션 */}
+      <motion.div variants={itemVariants} className="mt-8">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+            <Camera className="w-4 h-4 text-green-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">실시간 분석 운동</h3>
+            <p className="text-xs text-muted-foreground">분석 없이 바로 시작 가능</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {COUNTABLE_EXERCISES.slice(0, 4).map((exercise) => (
+            <RealtimeExerciseCard key={exercise.id} exercise={exercise} />
+          ))}
+        </div>
       </motion.div>
 
       <motion.div variants={itemVariants} className="mt-6 space-y-3">
@@ -348,6 +424,27 @@ function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
                 index={index}
                 programId={program.id}
               />
+            ))}
+          </div>
+        </motion.section>
+
+        {/* 실시간 분석 운동 섹션 */}
+        <motion.section variants={itemVariants} className="mt-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                <Camera className="w-4 h-4 text-green-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">실시간 분석 운동</h3>
+                <p className="text-xs text-muted-foreground">카메라로 자동 횟수 카운팅</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {COUNTABLE_EXERCISES.slice(0, 4).map((exercise) => (
+              <RealtimeExerciseCard key={exercise.id} exercise={exercise} />
             ))}
           </div>
         </motion.section>

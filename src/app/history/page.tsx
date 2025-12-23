@@ -10,7 +10,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Calendar, TrendingUp, ChevronRight, Trash2, Loader2, User, BarChart3, ImageIcon } from 'lucide-react';
+import { Calendar, TrendingUp, ChevronRight, Trash2, Loader2, User, BarChart3, ImageIcon, PieChart } from 'lucide-react';
 import AppHeader from '@/components/layout/AppHeader';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getAnalysisHistory, deleteAnalysisResult, type AnalysisResultRow } from '@/lib/supabase';
@@ -195,10 +195,23 @@ export default function HistoryPage() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-2xl font-bold text-foreground">기록</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            자세 분석 기록을 확인하세요
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">기록</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                자세 분석 기록을 확인하세요
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push('/stats')}
+              className="flex items-center gap-1"
+            >
+              <PieChart className="w-4 h-4" />
+              통계
+            </Button>
+          </div>
         </motion.div>
 
         {/* 메인 콘텐츠 */}

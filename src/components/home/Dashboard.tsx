@@ -26,6 +26,7 @@ import {
   MoveVertical,
   StretchHorizontal,
   LucideIcon,
+  BarChart3,
 } from 'lucide-react';
 import useStore, { useAnalysisResult } from '@/store/useStore';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -476,10 +477,13 @@ export default function Dashboard() {
                     </div>
                     <CardTitle className="text-lg">이번 주 기록</CardTitle>
                   </div>
-                  {/* 완료 일수 뱃지 */}
-                  <Badge variant="secondary">
-                    {completedDays}/7일 완료
-                  </Badge>
+                  {/* 통계 보기 버튼 */}
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href="/stats" className="text-primary">
+                      <BarChart3 className="w-4 h-4 mr-1" />
+                      통계
+                    </Link>
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent>

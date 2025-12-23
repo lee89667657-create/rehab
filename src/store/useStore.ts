@@ -45,6 +45,30 @@ interface CapturedImages {
 }
 
 /**
+ * 3D 랜드마크 포인트 타입
+ * MediaPipe world_landmarks 형식
+ */
+interface Landmark3D {
+  x: number;          // X 좌표 (미터 단위)
+  y: number;          // Y 좌표 (미터 단위)
+  z: number;          // Z 좌표 (미터 단위)
+  visibility: number; // 가시성 점수 (0~1)
+}
+
+/**
+ * 뷰별 랜드마크 데이터 타입
+ * 정면/측면/후면 각각의 33개 랜드마크 배열
+ */
+interface LandmarksByView {
+  /** 정면 촬영 시 랜드마크 (33개) */
+  front: Landmark3D[] | null;
+  /** 측면 촬영 시 랜드마크 (33개) */
+  side: Landmark3D[] | null;
+  /** 후면 촬영 시 랜드마크 (33개) */
+  back: Landmark3D[] | null;
+}
+
+/**
  * 앱 전역 상태 인터페이스
  */
 interface AppState {
@@ -106,6 +130,27 @@ interface AppState {
    * 관절각 데이터 초기화
    */
   clearJointAngles: () => void;
+
+  // ========================================
+  // 3D 랜드마크 데이터 (스켈레톤 시각화용)
+  // ========================================
+
+  /**
+   * 뷰별 3D 랜드마크 데이터
+   * MediaPipe world_landmarks 기반, 정면/측면/후면 각각 저장
+   */
+  landmarks: LandmarksByView;
+
+  /**
+   * 랜드마크 데이터 저장
+   * @param data - 뷰별 랜드마크 객체
+   */
+  setLandmarks: (data: LandmarksByView) => void;
+
+  /**
+   * 랜드마크 데이터 초기화
+   */
+  clearLandmarks: () => void;
 
   // ========================================
   // 촬영 이미지
@@ -208,6 +253,15 @@ const initialCapturedImages: CapturedImages = {
 };
 
 /**
+ * 초기 랜드마크 상태
+ */
+const initialLandmarks: LandmarksByView = {
+  front: null,
+  side: null,
+  back: null,
+};
+
+/**
  * Zustand 스토어 생성
  *
  * persist 미들웨어를 사용하여 일부 상태를 localStorage에 저장합니다.
@@ -266,6 +320,25 @@ const useStore = create<AppState>()(
       clearJointAngles: () =>
         set({
           jointAngles: null,
+        }),
+
+      // ========================================
+      // 3D 랜드마크 데이터 (스켈레톤 시각화용)
+      // ========================================
+
+      /** 초기 랜드마크 데이터: 모두 null */
+      landmarks: initialLandmarks,
+
+      /** 랜드마크 데이터 저장 */
+      setLandmarks: (data) =>
+        set({
+          landmarks: data,
+        }),
+
+      /** 랜드마크 데이터 초기화 */
+      clearLandmarks: () =>
+        set({
+          landmarks: initialLandmarks,
         }),
 
       // ========================================
@@ -355,6 +428,7 @@ const useStore = create<AppState>()(
           userName: '사용자',
           analysisResult: null,
           jointAngles: null,
+          landmarks: initialLandmarks,
           capturedImages: initialCapturedImages,
           currentExerciseIndex: 0,
           currentSet: 1,
@@ -400,6 +474,9 @@ export const useAnalysisResult = () => useStore((state) => state.analysisResult)
 
 /** 관절각 데이터 셀렉터 */
 export const useJointAngles = () => useStore((state) => state.jointAngles);
+
+/** 3D 랜드마크 셀렉터 */
+export const useLandmarks = () => useStore((state) => state.landmarks);
 
 /** 촬영 이미지 셀렉터 */
 export const useCapturedImages = () => useStore((state) => state.capturedImages);

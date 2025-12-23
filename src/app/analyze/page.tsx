@@ -293,6 +293,7 @@ export default function AnalyzePage() {
   const setAnalysisResult = useStore((state) => state.setAnalysisResult);
   const setCapturedImage = useStore((state) => state.setCapturedImage);
   const setJointAngles = useStore((state) => state.setJointAngles);
+  const setLandmarks = useStore((state) => state.setLandmarks);
 
   const [currentModeIndex, setCurrentModeIndex] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -414,11 +415,88 @@ export default function AnalyzePage() {
         // 각 촬영 뷰별 랜드마크 추출 (스켈레톤 렌더링용)
         // ============================================================
         // 정면, 측면, 후면 촬영 시 저장된 랜드마크를 뷰별로 분리
-        const landmarksByView = {
-          front: updatedData.find(d => d.mode === 'front')?.landmarks || null,
-          side: updatedData.find(d => d.mode === 'side')?.landmarks || null,
-          back: updatedData.find(d => d.mode === 'back')?.landmarks || null,
+
+        /**
+         * 랜드마크 정규화 함수
+         * - 반드시 { x, y, z, visibility } 형태로 변환
+         * - 누락된 필드는 기본값으로 채움
+         * - 33개 포인트 검증
+         */
+        const normalizeLandmarks = (
+          rawLandmarks: Landmark[] | null | undefined
+        ): Landmark[] | null => {
+          if (!rawLandmarks || rawLandmarks.length === 0) {
+            return null;
+          }
+
+          // 33개 포인트 검증 (MediaPipe Pose는 33개 랜드마크)
+          if (rawLandmarks.length !== 33) {
+            console.warn(
+              `[Analyze] 랜드마크 개수 이상: ${rawLandmarks.length}개 (expected: 33)`
+            );
+          }
+
+          // 정규화: 각 랜드마크를 { x, y, z, visibility } 형태로 보장
+          return rawLandmarks.map((lm, idx) => ({
+            x: typeof lm.x === 'number' ? lm.x : 0,
+            y: typeof lm.y === 'number' ? lm.y : 0,
+            z: typeof lm.z === 'number' ? lm.z : 0,
+            visibility: typeof lm.visibility === 'number' ? lm.visibility : 0,
+          }));
         };
+
+        // 뷰별 랜드마크 추출 및 정규화
+        const rawFront = updatedData.find(d => d.mode === 'front')?.landmarks;
+        const rawSide = updatedData.find(d => d.mode === 'side')?.landmarks;
+        const rawBack = updatedData.find(d => d.mode === 'back')?.landmarks;
+
+        const landmarksByView = {
+          front: normalizeLandmarks(rawFront),
+          side: normalizeLandmarks(rawSide),
+          back: normalizeLandmarks(rawBack),
+        };
+
+        // ============================================================
+        // 랜드마크 저장 로그 (디버깅용)
+        // ============================================================
+        console.log('========================================');
+        console.log('[Analyze] 랜드마크 저장 시작');
+        console.log('========================================');
+
+        if (landmarksByView.front) {
+          console.log('[Analyze] Front landmarks:', landmarksByView.front.length, '개');
+          console.log('[Analyze] Front 샘플 (index 0):', landmarksByView.front[0]);
+          console.log('[Analyze] Front 샘플 (index 11, 좌측어깨):', landmarksByView.front[11]);
+          console.log('[Analyze] Front 샘플 (index 23, 좌측골반):', landmarksByView.front[23]);
+
+          // 좌표 범위 확인 (normalized: 0~1, world: 미터 단위)
+          const sampleX = landmarksByView.front[11]?.x || 0;
+          if (sampleX >= 0 && sampleX <= 1) {
+            console.log('[Analyze] 좌표 타입: NORMALIZED (0~1 범위)');
+          } else {
+            console.log('[Analyze] 좌표 타입: WORLD (미터 단위)');
+          }
+        } else {
+          console.log('[Analyze] Front landmarks: 없음');
+        }
+
+        if (landmarksByView.side) {
+          console.log('[Analyze] Side landmarks:', landmarksByView.side.length, '개');
+        } else {
+          console.log('[Analyze] Side landmarks: 없음');
+        }
+
+        if (landmarksByView.back) {
+          console.log('[Analyze] Back landmarks:', landmarksByView.back.length, '개');
+        } else {
+          console.log('[Analyze] Back landmarks: 없음');
+        }
+
+        console.log('========================================');
+
+        // 랜드마크 데이터를 store에 저장 (3D 스켈레톤 시각화용)
+        setLandmarks(landmarksByView);
+        console.log('[Analyze] Store에 랜드마크 저장 완료');
 
         const analysisRecord = {
           id: Date.now().toString(),
@@ -460,7 +538,7 @@ export default function AnalyzePage() {
         router.push('/result');
       }, 500);
     }
-  }, [currentMode.mode, capturedData, currentModeIndex, setAnalysisResult, setJointAngles, setCapturedImage, router]);
+  }, [currentMode.mode, capturedData, currentModeIndex, setAnalysisResult, setJointAngles, setLandmarks, setCapturedImage, router]);
 
   // 촬영 시작 (3초 카운트다운)
   const handleCaptureStart = () => {
