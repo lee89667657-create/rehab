@@ -185,20 +185,59 @@ MediaPipe 랜드마크 → 계층적 피벗 회전 → 3D 휴머노이드
 
 ## 스크린샷
 
+### 메인 대시보드
+<p align="center">
+  <img src="./public/screenshots/dashboard.png" alt="Dashboard" width="800" />
+</p>
+
+- 오늘의 자세 점수
+- 최근 분석 요약
+- 추천 운동 프로그램
+
 ### 자세 분석
+<p align="center">
+  <img src="./public/screenshots/analyze.png" alt="Posture Analysis" width="800" />
+</p>
+
 - 정면/측면 카메라 분석
 - 실시간 랜드마크 오버레이
 - 자세 이상 하이라이트
 
 ### 3D 결과 시각화
+<p align="center">
+  <img src="./public/screenshots/result-3d.png" alt="3D Visualization" width="800" />
+</p>
+
 - 휴머노이드 모델 포즈 재현
 - 기준선 대비 자세 확인
-- 다각도 뷰 지원
+- Front/Side/Back 다각도 뷰
+
+### 분석 결과 상세
+<p align="center">
+  <img src="./public/screenshots/result-detail.png" alt="Analysis Result" width="800" />
+</p>
+
+- 각 지표별 상세 분석
+- 정상/주의/경고 상태 표시
+- 개선 권장사항
 
 ### 운동 프로그램
+<p align="center">
+  <img src="./public/screenshots/exercise.png" alt="Exercise Program" width="800" />
+</p>
+
 - 맞춤형 운동 추천
-- 단계별 가이드
-- 실시간 피드백
+- 카테고리별 분류
+- 난이도 및 소요시간 표시
+
+### 실시간 운동 모드
+<p align="center">
+  <img src="./public/screenshots/realtime-exercise.png" alt="Realtime Exercise" width="800" />
+</p>
+
+- 카메라 기반 실시간 피드백
+- 목표 각도 가이드
+- 세트/반복 카운팅
 
 ## 라이선스
 
