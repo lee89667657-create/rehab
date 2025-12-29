@@ -14,22 +14,15 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   Camera,
-  Clock,
   Dumbbell,
   ChevronRight,
   LogOut,
   Calendar,
-  TrendingUp,
-  Activity,
-  Play,
-  Target,
-  Zap,
   Lightbulb,
   MoveVertical,
   StretchHorizontal,
   LucideIcon,
-  BarChart3,
-  Sparkles,
+  Target,
 } from 'lucide-react';
 import useStore, { useAnalysisResult } from '@/store/useStore';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -331,58 +324,50 @@ export default function Dashboard() {
           {/* 메인 점수 카드 */}
           <motion.section variants={itemVariants}>
             {analysisResult ? (
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                <div className="flex items-center gap-5">
-                  <ScoreCircle value={overallScore} size={110} strokeWidth={8} />
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                <div className="flex items-center gap-4">
+                  <ScoreCircle value={overallScore} size={90} strokeWidth={7} />
 
                   <div className="flex-1">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Activity className="w-4 h-4 text-blue-500" />
-                      <span className="text-sm text-gray-500">종합 자세 점수</span>
-                    </div>
+                    <span className="text-xs text-gray-400">종합 자세 점수</span>
 
-                    <h2 className="text-2xl font-bold text-gray-800 mb-1">
+                    <h2 className="text-lg font-semibold text-gray-800 mt-0.5">
                       {scoreMessage.text}
                     </h2>
 
-                    <p className="text-sm text-gray-500 mb-3">
+                    <p className="text-sm text-gray-500 mt-0.5">
                       {scoreMessage.subText}
                     </p>
-
-                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 text-xs font-medium rounded-md">
-                      <Sparkles className="w-3 h-3" />
-                      {totalItemsCount}개 중 {normalItemsCount}개 정상
-                    </span>
                   </div>
                 </div>
 
                 <Link
                   href="/result"
-                  className="mt-5 flex items-center justify-center gap-1 w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors"
+                  className="mt-4 flex items-center justify-center gap-1 w-full py-2.5 bg-white hover:bg-blue-50 text-blue-500 font-medium rounded-lg border border-gray-200 transition-colors"
                 >
                   상세 결과 보기
                   <ChevronRight className="w-4 h-4" />
                 </Link>
               </div>
             ) : (
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-8 text-center text-white">
-                <motion.div
-                  className="w-20 h-20 mx-auto mb-5 bg-white/10 rounded-2xl flex items-center justify-center"
-                  whileHover={{ scale: 1.05 }}
-                >
-                  <Camera className="w-10 h-10" />
-                </motion.div>
-
-                <h2 className="text-xl font-semibold mb-2">
-                  첫 분석을 시작해보세요
-                </h2>
-                <p className="text-blue-100 text-sm mb-6">
-                  AI가 자세를 분석하고 맞춤 운동을 추천해드려요
-                </p>
+              <div className="bg-gradient-to-r from-blue-500 to-blue-400 rounded-xl px-6 py-6 text-white">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center">
+                    <Camera className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-lg font-semibold">
+                      첫 분석을 시작해보세요
+                    </h2>
+                    <p className="text-blue-100 text-sm mt-0.5">
+                      AI가 자세를 분석하고 맞춤 운동을 추천해드려요
+                    </p>
+                  </div>
+                </div>
 
                 <Link
                   href="/analyze"
-                  className="inline-flex items-center gap-1 px-6 py-3 bg-white text-blue-600 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                  className="mt-4 flex items-center justify-center gap-1 w-full py-2.5 bg-white text-blue-600 font-medium rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   자세 분석 시작하기
                   <ChevronRight className="w-4 h-4" />
@@ -395,43 +380,98 @@ export default function Dashboard() {
           <motion.section className="grid grid-cols-2 gap-3" variants={itemVariants}>
             <Link
               href="/analyze"
-              className="flex flex-col items-center justify-center gap-2 h-20 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-xl transition-colors"
+              className="flex items-center justify-center gap-2 h-14 bg-white hover:bg-blue-50 hover:border-blue-300 text-gray-700 hover:text-blue-600 font-medium rounded-xl border border-gray-200 transition-all"
             >
-              <Camera className="w-5 h-5" />
+              <Camera className="w-4 h-4" />
               <span className="text-sm">{analysisResult ? '다시 분석' : '자세 분석'}</span>
             </Link>
 
             <Link
               href="/exercise"
-              className="flex flex-col items-center justify-center gap-2 h-20 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-xl border border-gray-200 transition-colors"
+              className="flex items-center justify-center gap-2 h-14 bg-white hover:bg-blue-50 hover:border-blue-300 text-gray-700 hover:text-blue-600 font-medium rounded-xl border border-gray-200 transition-all"
             >
-              <Dumbbell className="w-5 h-5" />
+              <Dumbbell className="w-4 h-4" />
               <span className="text-sm">{currentExerciseIndex > 0 ? '이어하기' : '운동 시작'}</span>
             </Link>
           </motion.section>
 
-          {/* 이번 주 기록 */}
+          {/* 추천 운동 - 새로운 Calm 스타일 */}
           <motion.section variants={itemVariants}>
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-                    <TrendingUp className="w-4 h-4 text-emerald-500" />
-                  </div>
-                  <span className="font-semibold text-gray-800">이번 주 기록</span>
-                </div>
-                <Link href="/stats" className="text-sm text-blue-500 flex items-center gap-1">
-                  <BarChart3 className="w-4 h-4" />
+            <div className="flex items-center justify-between mb-3">
+              <span className="font-semibold text-gray-800">
+                {analysisResult ? '맞춤 추천 운동' : '추천 운동'}
+              </span>
+              <Link href="/exercise" className="text-sm text-gray-400 hover:text-blue-500 flex items-center gap-0.5 transition-colors">
+                전체 보기
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            {/* 운동 카드 목록 - 심플한 리스트 형태 */}
+            <div className="space-y-2">
+              {recommendedExercises.slice(0, 3).map((exercise, index) => (
+                <motion.div
+                  key={exercise.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05 * index }}
+                >
+                  <Link href={`/exercise?type=${exercise.id}`}>
+                    <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center hover:border-blue-300 hover:bg-blue-50/30 transition-all group">
+                      {/* 왼쪽 컬러 바 */}
+                      <div className={`w-1 h-12 rounded-full mr-4 ${
+                        exercise.difficulty === '초급'
+                          ? 'bg-emerald-400'
+                          : exercise.difficulty === '중급'
+                            ? 'bg-blue-400'
+                            : 'bg-amber-400'
+                      }`} />
+
+                      {/* 텍스트 정보 */}
+                      <div className="flex-1">
+                        <h3 className="font-medium text-gray-800 group-hover:text-blue-600 transition-colors">
+                          {exercise.name}
+                        </h3>
+                        <p className="text-sm text-gray-500">{exercise.description}</p>
+                      </div>
+
+                      {/* 오른쪽 난이도 + 화살표 */}
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          exercise.difficulty === '초급'
+                            ? 'bg-emerald-50 text-emerald-600'
+                            : exercise.difficulty === '중급'
+                              ? 'bg-blue-50 text-blue-600'
+                              : 'bg-amber-50 text-amber-600'
+                        }`}>
+                          {exercise.difficulty}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-400 transition-colors" />
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          </motion.section>
+
+          {/* 이번 주 기록 - 컴팩트 버전 */}
+          <motion.section variants={itemVariants}>
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-semibold text-gray-800 text-sm">이번 주</span>
+                <Link href="/stats" className="text-xs text-gray-400 hover:text-blue-500 flex items-center gap-1 transition-colors">
                   통계
+                  <ChevronRight className="w-3 h-3" />
                 </Link>
               </div>
 
-              {/* 주간 막대 */}
-              <div className="flex justify-between items-end gap-2">
+              {/* 주간 막대 - 작은 버전 */}
+              <div className="flex justify-between items-end gap-1.5">
                 {weeklyRecord.map((record) => (
-                  <div key={record.date} className="flex flex-col items-center gap-1.5 flex-1">
+                  <div key={record.date} className="flex flex-col items-center gap-1 flex-1">
                     <div
-                      className={`w-full max-w-[28px] h-16 rounded-lg ${
+                      className={`w-full max-w-[24px] h-8 rounded ${
                         record.completed
                           ? 'bg-blue-500'
                           : record.isToday
@@ -440,12 +480,10 @@ export default function Dashboard() {
                       }`}
                     />
                     <span
-                      className={`text-xs ${
+                      className={`text-[10px] ${
                         record.isToday
                           ? 'text-blue-500 font-semibold'
-                          : record.completed
-                            ? 'text-gray-700'
-                            : 'text-gray-400'
+                          : 'text-gray-400'
                       }`}
                     >
                       {record.day}
@@ -455,96 +493,10 @@ export default function Dashboard() {
               </div>
 
               {/* 주간 달성률 */}
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-gray-500">주간 달성률</span>
-                  <span className="font-semibold text-gray-800">{Math.round((completedDays / 7) * 100)}%</span>
-                </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-blue-500 rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(completedDays / 7) * 100}%` }}
-                    transition={{ duration: 0.8, ease: 'easeOut' }}
-                  />
-                </div>
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-xs text-gray-400">주간 달성률</span>
+                <span className="text-sm font-semibold text-gray-800">{Math.round((completedDays / 7) * 100)}%</span>
               </div>
-            </div>
-          </motion.section>
-
-          {/* 추천 운동 */}
-          <motion.section variants={itemVariants}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                  <Target className="w-4 h-4 text-blue-500" />
-                </div>
-                <span className="font-semibold text-gray-800">
-                  {analysisResult ? '맞춤 추천 운동' : '추천 운동'}
-                </span>
-              </div>
-              <Link href="/exercise" className="text-sm text-blue-500 flex items-center gap-0.5">
-                전체 보기
-                <ChevronRight className="w-4 h-4" />
-              </Link>
-            </div>
-
-            {/* 운동 카드 목록 */}
-            <div className="flex gap-3 overflow-x-auto pb-2 -mx-6 px-6 scrollbar-hide">
-              {recommendedExercises.map((exercise, index) => {
-                const ExerciseIcon = exercise.icon;
-
-                return (
-                  <motion.div
-                    key={exercise.id}
-                    initial={{ opacity: 0, x: 30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 * index }}
-                    whileHover={{ y: -3 }}
-                    className="flex-shrink-0"
-                  >
-                    <Link href={`/exercise?type=${exercise.id}`}>
-                      <div className="w-40 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                        {/* 상단 아이콘 영역 */}
-                        <div className="h-24 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center relative">
-                          <ExerciseIcon className="w-10 h-10 text-blue-500" />
-
-                          <div className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center">
-                            <Play className="w-3 h-3 text-white fill-white ml-0.5" />
-                          </div>
-
-                          <span className="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 bg-white/80 text-gray-600 text-[10px] rounded">
-                            <Clock className="w-3 h-3" />
-                            {exercise.duration}
-                          </span>
-                        </div>
-
-                        {/* 하단 정보 */}
-                        <div className="p-3">
-                          <h3 className="font-semibold text-gray-800 text-sm mb-1">
-                            {exercise.name}
-                          </h3>
-                          <p className="text-xs text-gray-500 mb-2 line-clamp-1">
-                            {exercise.description}
-                          </p>
-                          <span
-                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded ${
-                              exercise.difficulty === '초급'
-                                ? 'bg-emerald-50 text-emerald-600'
-                                : exercise.difficulty === '중급'
-                                  ? 'bg-amber-50 text-amber-600'
-                                  : 'bg-red-50 text-red-600'
-                            }`}
-                          >
-                            <Zap className="w-3 h-3" />
-                            {exercise.difficulty}
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  </motion.div>
-                );
-              })}
             </div>
           </motion.section>
 
