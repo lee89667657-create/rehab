@@ -1135,8 +1135,9 @@ export default function ResultPage() {
           </motion.section>
 
           {/* ============================================================ */}
-          {/* 스켈레톤 정렬 분석 섹션 - Calm 스타일 */}
+          {/* 스켈레톤 정렬 분석 섹션 - 임시 비활성화 (나중에 다시 추가 예정) */}
           {/* ============================================================ */}
+          {/*
           <motion.section variants={itemVariants}>
             <Card className="mb-4">
               <CardHeader className="pb-3">
@@ -1146,11 +1147,8 @@ export default function ResultPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {/* 정면/측면 그리드 - 크고 밝은 스타일 */}
                 <div className="grid grid-cols-2 gap-4">
-                  {/* 정면 스켈레톤 */}
                   <div className="relative bg-slate-50 border border-gray-200 rounded-xl p-4 aspect-[3/4] flex items-center justify-center overflow-hidden">
-                    {/* 배경 이미지 (있으면) */}
                     {displayImages.front && (
                       <img
                         src={displayImages.front}
@@ -1158,51 +1156,33 @@ export default function ResultPage() {
                         className="absolute inset-0 w-full h-full object-cover opacity-20"
                       />
                     )}
-
-                    {/* 중앙 기준선 */}
                     <div className="absolute left-1/2 top-4 bottom-4 w-px border-l-2 border-dashed border-rose-300" />
-
-                    {/* 수평 기준선 (어깨, 골반) */}
                     <div className="absolute left-4 right-4 top-[22%] border-t border-dashed border-amber-300" />
                     <div className="absolute left-4 right-4 top-[48%] border-t border-dashed border-amber-300" />
-
-                    {/* 정면 스켈레톤 SVG */}
                     <svg className="absolute inset-0 w-full h-full" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}>
-                      {/* 머리 */}
                       <circle cx="50%" cy="14%" r="8" fill="#3B82F6" />
-                      {/* 목 */}
                       <line x1="50%" y1="14%" x2="50%" y2="22%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      {/* 어깨 라인 */}
                       <line x1="30%" y1="22%" x2="70%" y2="22%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
                       <circle cx="30%" cy="22%" r="6" fill="#3B82F6" />
                       <circle cx="70%" cy="22%" r="6" fill="#3B82F6" />
-                      {/* 척추 */}
                       <line x1="50%" y1="22%" x2="50%" y2="48%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      {/* 골반 라인 */}
                       <line x1="36%" y1="48%" x2="64%" y2="48%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
                       <circle cx="36%" cy="48%" r="6" fill="#3B82F6" />
                       <circle cx="64%" cy="48%" r="6" fill="#3B82F6" />
-                      {/* 허벅지 */}
                       <line x1="36%" y1="48%" x2="36%" y2="72%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
                       <line x1="64%" y1="48%" x2="64%" y2="72%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
                       <circle cx="36%" cy="72%" r="5" fill="#3B82F6" />
                       <circle cx="64%" cy="72%" r="5" fill="#3B82F6" />
-                      {/* 종아리 */}
                       <line x1="36%" y1="72%" x2="36%" y2="88%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
                       <line x1="64%" y1="72%" x2="64%" y2="88%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
                       <circle cx="36%" cy="88%" r="4" fill="#3B82F6" />
                       <circle cx="64%" cy="88%" r="4" fill="#3B82F6" />
                     </svg>
-
-                    {/* 뷰 라벨 */}
                     <span className="absolute bottom-2 left-2 text-xs font-medium text-gray-500 bg-white/80 px-2 py-1 rounded-md">
                       정면
                     </span>
                   </div>
-
-                  {/* 측면 스켈레톤 */}
                   <div className="relative bg-slate-50 border border-gray-200 rounded-xl p-4 aspect-[3/4] flex items-center justify-center overflow-hidden">
-                    {/* 배경 이미지 (있으면) */}
                     {displayImages.side && (
                       <img
                         src={displayImages.side}
@@ -1210,40 +1190,23 @@ export default function ResultPage() {
                         className="absolute inset-0 w-full h-full object-cover opacity-20"
                       />
                     )}
-
-                    {/* 이상적 정렬선 (수직) */}
                     <div className="absolute left-1/2 top-4 bottom-4 w-px border-l-2 border-emerald-400" />
-
-                    {/* 측면 스켈레톤 SVG */}
                     <svg className="absolute inset-0 w-full h-full" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}>
-                      {/* 머리 - 약간 앞으로 */}
                       <circle cx="54%" cy="14%" r="8" fill="#3B82F6" />
-                      {/* 목 */}
                       <line x1="54%" y1="14%" x2="52%" y2="22%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      {/* 어깨 */}
                       <circle cx="52%" cy="22%" r="6" fill="#3B82F6" />
-                      {/* 척추 - 자연스러운 S커브 */}
                       <line x1="52%" y1="22%" x2="48%" y2="48%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      {/* 골반 */}
                       <circle cx="48%" cy="48%" r="6" fill="#3B82F6" />
-                      {/* 허벅지 */}
                       <line x1="48%" y1="48%" x2="50%" y2="72%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      {/* 무릎 */}
                       <circle cx="50%" cy="72%" r="5" fill="#3B82F6" />
-                      {/* 종아리 */}
                       <line x1="50%" y1="72%" x2="50%" y2="88%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      {/* 발목 */}
                       <circle cx="50%" cy="88%" r="4" fill="#3B82F6" />
                     </svg>
-
-                    {/* 뷰 라벨 */}
                     <span className="absolute bottom-2 left-2 text-xs font-medium text-gray-500 bg-white/80 px-2 py-1 rounded-md">
                       측면
                     </span>
                   </div>
                 </div>
-
-                {/* 범례 */}
                 <div className="flex justify-center gap-6 mt-4 text-xs text-gray-500">
                   <div className="flex items-center gap-1.5">
                     <div className="w-3 h-3 bg-blue-500 rounded-full" />
@@ -1261,6 +1224,7 @@ export default function ResultPage() {
               </CardContent>
             </Card>
           </motion.section>
+          */}
 
           {/* ============================================================ */}
           {/* 3D Postural Analysis (깔끔한 단일 UI) */}
