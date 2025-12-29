@@ -63,83 +63,38 @@ interface DiseaseDefinition {
   };
 }
 
-// 질환 정의 목록
+/**
+ * 질환 정의 목록
+ *
+ * 현재 앱에서는 거북목/라운드숄더 2개 질환만 분석합니다.
+ * - forward_head: 거북목 증후군 (머리가 앞으로 나온 자세)
+ * - round_shoulder: 라운드숄더 (어깨가 앞으로 말린 자세)
+ */
 const DISEASE_DEFINITIONS: DiseaseDefinition[] = [
   {
-    id: 'cervical_disc',
-    name: '경추 디스크',
-    description: '목뼈 사이의 디스크가 탈출하여 신경을 압박하는 질환',
-    symptoms: ['목 통증', '어깨/팔 저림', '두통', '손 힘 약화'],
-    causes: ['거북목 자세', '장시간 컴퓨터 사용', '잘못된 수면 자세'],
-    relatedParts: ['목', '어깨', '팔'],
-    weights: { forward_head: 0.7, shoulder_tilt: 0.3 },
+    id: 'forward_head',
+    name: '거북목 증후군',
+    description: '머리가 어깨보다 앞으로 나와 목에 부담이 가는 자세',
+    symptoms: ['목 통증', '두통', '어깨 결림', '집중력 저하'],
+    causes: ['장시간 스마트폰 사용', '모니터 높이 불량', '잘못된 수면 자세'],
+    relatedParts: ['목', '어깨', '머리'],
+    weights: { forward_head: 0.8, shoulder_tilt: 0.2 },
     thresholds: {
-      forward_head: { warning: 2.5, danger: 4 },
+      forward_head: { warning: 2, danger: 3.5 },
       shoulder_tilt: { warning: 1.5, danger: 3 },
     },
   },
   {
-    id: 'frozen_shoulder',
-    name: '오십견 (동결견)',
-    description: '어깨 관절의 움직임이 제한되는 질환',
-    symptoms: ['어깨 통증', '팔 올리기 어려움', '야간 통증', '어깨 뻣뻣함'],
-    causes: ['어깨 불균형', '근육 약화', '자세 불량', '운동 부족'],
-    relatedParts: ['어깨', '팔'],
-    weights: { shoulder_tilt: 0.6, forward_head: 0.4 },
+    id: 'round_shoulder',
+    name: '라운드숄더',
+    description: '어깨가 앞으로 말려 등이 굽어지는 자세',
+    symptoms: ['어깨 통증', '등 결림', '가슴 답답함', '호흡 불편'],
+    causes: ['장시간 컴퓨터 사용', '운동 부족', '가슴 근육 단축'],
+    relatedParts: ['어깨', '등', '가슴'],
+    weights: { shoulder_tilt: 0.7, forward_head: 0.3 },
     thresholds: {
       shoulder_tilt: { warning: 1.5, danger: 2.5 },
       forward_head: { warning: 3, danger: 5 },
-    },
-  },
-  {
-    id: 'lumbar_disc',
-    name: '요추 디스크',
-    description: '허리뼈 사이의 디스크가 탈출하여 신경을 압박하는 질환',
-    symptoms: ['허리 통증', '다리 저림', '보행 장애', '하지 근력 약화'],
-    causes: ['골반 틀어짐', '잘못된 자세', '무거운 물건 들기', '비만'],
-    relatedParts: ['허리', '골반', '다리'],
-    weights: { pelvis_tilt: 0.6, knee_angle: 0.2, shoulder_tilt: 0.2 },
-    thresholds: {
-      pelvis_tilt: { warning: 1, danger: 2 },
-      knee_angle: { warning: 175, danger: 170 },
-    },
-  },
-  {
-    id: 'scoliosis',
-    name: '척추측만증',
-    description: '척추가 옆으로 휘어지는 질환',
-    symptoms: ['허리 통증', '어깨 높이 차이', '골반 불균형', '피로감'],
-    causes: ['자세 불량', '근력 불균형', '성장기 자세 습관', '유전'],
-    relatedParts: ['척추', '어깨', '골반'],
-    weights: { shoulder_tilt: 0.4, pelvis_tilt: 0.4, forward_head: 0.2 },
-    thresholds: {
-      shoulder_tilt: { warning: 1, danger: 2 },
-      pelvis_tilt: { warning: 1, danger: 2 },
-    },
-  },
-  {
-    id: 'knee_arthritis',
-    name: '무릎 관절염',
-    description: '무릎 연골이 닳아 통증과 염증이 발생하는 질환',
-    symptoms: ['무릎 통증', '관절 붓기', '계단 오르내리기 어려움', '무릎 소리'],
-    causes: ['O다리/X다리', '과체중', '무릎 부상', '노화'],
-    relatedParts: ['무릎', '다리'],
-    weights: { knee_angle: 0.7, pelvis_tilt: 0.3 },
-    thresholds: {
-      knee_angle: { warning: 175, danger: 165 },
-      pelvis_tilt: { warning: 1.5, danger: 2.5 },
-    },
-  },
-  {
-    id: 'tension_headache',
-    name: '긴장성 두통',
-    description: '근육 긴장으로 인한 만성 두통',
-    symptoms: ['두통', '목/어깨 뻣뻣함', '집중력 저하', '눈 피로'],
-    causes: ['거북목', '스트레스', '장시간 모니터 사용', '수면 부족'],
-    relatedParts: ['머리', '목', '어깨'],
-    weights: { forward_head: 0.8, shoulder_tilt: 0.2 },
-    thresholds: {
-      forward_head: { warning: 2, danger: 3.5 },
     },
   },
 ];
@@ -250,11 +205,10 @@ export function analyzeDiseaseRisk(analysisItems: AnalysisItem[]): DiseaseRiskAn
   // 위험도 순으로 정렬
   diseases.sort((a, b) => b.risk - a.risk);
 
-  // 전체 위험도 계산 (상위 3개 질환의 가중 평균)
-  const topDiseases = diseases.slice(0, 3);
-  const weights = [0.5, 0.3, 0.2];
+  // 전체 위험도 계산 (2개 질환의 가중 평균: 거북목 50%, 라운드숄더 50%)
+  const weights = [0.5, 0.5];
   const overallRisk = Math.round(
-    topDiseases.reduce((sum, d, i) => sum + d.risk * weights[i], 0)
+    diseases.reduce((sum, d, i) => sum + d.risk * weights[i], 0)
   );
 
   // 가장 우려되는 질환 (위험도 30% 이상인 경우만)
@@ -295,25 +249,13 @@ function generateRecommendations(diseases: DiseaseRisk[], overallRisk: number): 
 
   // 상위 위험 질환에 대한 구체적 권장 사항
   const highRiskDiseases = diseases.filter((d) => d.risk >= 40);
-  highRiskDiseases.slice(0, 2).forEach((disease) => {
+  highRiskDiseases.forEach((disease) => {
     switch (disease.id) {
-      case 'cervical_disc':
-        recommendations.push('목 스트레칭과 자세 교정 운동을 매일 실시하세요.');
+      case 'forward_head':
+        recommendations.push('턱 당기기와 목 스트레칭을 매일 실시하세요.');
         break;
-      case 'frozen_shoulder':
-        recommendations.push('어깨 가동 범위 운동을 천천히 시작하세요.');
-        break;
-      case 'lumbar_disc':
-        recommendations.push('코어 근육 강화 운동이 도움이 됩니다.');
-        break;
-      case 'scoliosis':
-        recommendations.push('좌우 균형 맞추기 운동을 권장합니다.');
-        break;
-      case 'knee_arthritis':
-        recommendations.push('하체 근력 강화와 체중 관리가 중요합니다.');
-        break;
-      case 'tension_headache':
-        recommendations.push('목과 어깨 이완 운동을 자주 해주세요.');
+      case 'round_shoulder':
+        recommendations.push('견갑골 모으기와 어깨 스트레칭을 권장합니다.');
         break;
     }
   });

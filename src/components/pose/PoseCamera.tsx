@@ -19,6 +19,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import Script from 'next/script';
+import { devStateLog } from '@/lib/logger';
 
 /**
  * 랜드마크(관절 포인트) 타입 정의
@@ -272,7 +273,7 @@ export default function PoseCamera({
         poseRef.current = pose;
         setIsLoading(false);
 
-        console.log('MediaPipe Pose 초기화 완료');
+        devStateLog('MediaPipe', 'Pose 초기화 완료');
       } catch (error) {
         console.error('MediaPipe Pose 초기화 실패:', error);
         setCameraError('AI 모델 초기화에 실패했습니다.');
@@ -398,7 +399,7 @@ export default function PoseCamera({
         src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"
         strategy="afterInteractive"
         onLoad={() => {
-          console.log('MediaPipe Pose 스크립트 로드됨');
+          devStateLog('MediaPipe', 'Pose 스크립트 로드됨');
           setScriptsLoaded((prev) => ({ ...prev, pose: true }));
         }}
         onError={() => setCameraError('MediaPipe 스크립트 로드 실패')}
@@ -407,7 +408,7 @@ export default function PoseCamera({
         src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
         strategy="afterInteractive"
         onLoad={() => {
-          console.log('MediaPipe Camera Utils 로드됨');
+          devStateLog('MediaPipe', 'Camera Utils 로드됨');
           setScriptsLoaded((prev) => ({ ...prev, camera: true }));
         }}
       />
@@ -415,7 +416,7 @@ export default function PoseCamera({
         src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
         strategy="afterInteractive"
         onLoad={() => {
-          console.log('MediaPipe Drawing Utils 로드됨');
+          devStateLog('MediaPipe', 'Drawing Utils 로드됨');
           setScriptsLoaded((prev) => ({ ...prev, drawing: true }));
         }}
       />

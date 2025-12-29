@@ -1,19 +1,17 @@
 /**
- * 자세 분석 페이지 - 삼성 헬스케어 스타일
+ * 자세 분석 페이지 - Calm 스타일
  *
  * 카메라로 사용자의 자세를 촬영하여 분석하는 페이지입니다.
- * 삼성 헬스케어 디자인 시스템을 적용한 카메라 UI입니다.
  *
  * ## 촬영 흐름
- * 1. 정면(front) 촬영 → 2. 측면(side) 촬영 → 3. 후면(back) 촬영
- * 3장 모두 촬영 완료 후 /result 페이지로 이동하여 결과 확인
+ * 1. 정면(front) 촬영 → 2. 측면(side) 촬영 → 완료
+ * 2장 모두 촬영 완료 후 /result 페이지로 이동하여 결과 확인
  *
  * ## 디자인 특징
- * - 삼성 블루 (#1428A0) 포인트 컬러
+ * - Calm 블루 (#3B82F6) 포인트 컬러
  * - 세로 비율 카메라 (9:16)
  * - 전신 실루엣 가이드라인 (점선, 반투명)
  * - 미니멀한 UI 컴포넌트
- * - 부드러운 애니메이션 (duration-300)
  */
 
 'use client';
@@ -26,6 +24,7 @@ import { ChevronLeft, Camera, Check, CheckCircle } from 'lucide-react';
 import { analyzePose } from '@/lib/poseAnalysis';
 import useStore from '@/store/useStore';
 import AppHeader from '@/components/layout/AppHeader';
+import { devLog, devWarn, devStateLog } from '@/lib/logger';
 
 // 고급 분석 모듈 (관절각 계산)
 import { calculateAllJointAngles } from '@/lib/advancedAnalysis';
@@ -41,7 +40,7 @@ interface Landmark {
   visibility: number;
 }
 
-type CaptureMode = 'front' | 'side' | 'back';
+type CaptureMode = 'front' | 'side';
 
 interface CapturedData {
   mode: CaptureMode;
@@ -59,9 +58,9 @@ const PoseCamera = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full bg-[#1A1A1A] flex items-center justify-center">
+      <div className="w-full h-full bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#1428A0] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-white text-sm">카메라 로딩 중...</p>
         </div>
       </div>
@@ -90,12 +89,6 @@ const CAPTURE_MODES: {
     label: '측면',
     guide: '옆으로 돌아서 측면을 보여주세요',
     silhouetteType: 'side',
-  },
-  {
-    mode: 'back',
-    label: '후면',
-    guide: '뒤로 돌아서 등을 보여주세요',
-    silhouetteType: 'front',
   },
 ];
 
@@ -392,11 +385,10 @@ export default function AnalyzePage() {
           console.error('관절각 계산 실패:', error);
         }
 
-        // 이미지 데이터도 함께 저장
+        // 이미지 데이터도 함께 저장 (정면, 측면만)
         const capturedImagesData = {
           front: updatedData.find(d => d.mode === 'front')?.image || null,
           side: updatedData.find(d => d.mode === 'side')?.image || null,
-          back: updatedData.find(d => d.mode === 'back')?.image || null,
         };
 
         // ============================================================
@@ -414,7 +406,7 @@ export default function AnalyzePage() {
         // ============================================================
         // 각 촬영 뷰별 랜드마크 추출 (스켈레톤 렌더링용)
         // ============================================================
-        // 정면, 측면, 후면 촬영 시 저장된 랜드마크를 뷰별로 분리
+        // 정면, 측면 촬영 시 저장된 랜드마크를 뷰별로 분리
 
         /**
          * 랜드마크 정규화 함수
@@ -431,13 +423,13 @@ export default function AnalyzePage() {
 
           // 33개 포인트 검증 (MediaPipe Pose는 33개 랜드마크)
           if (rawLandmarks.length !== 33) {
-            console.warn(
+            devWarn(
               `[Analyze] 랜드마크 개수 이상: ${rawLandmarks.length}개 (expected: 33)`
             );
           }
 
           // 정규화: 각 랜드마크를 { x, y, z, visibility } 형태로 보장
-          return rawLandmarks.map((lm, idx) => ({
+          return rawLandmarks.map((lm) => ({
             x: typeof lm.x === 'number' ? lm.x : 0,
             y: typeof lm.y === 'number' ? lm.y : 0,
             z: typeof lm.z === 'number' ? lm.z : 0,
@@ -445,58 +437,50 @@ export default function AnalyzePage() {
           }));
         };
 
-        // 뷰별 랜드마크 추출 및 정규화
+        // 뷰별 랜드마크 추출 및 정규화 (정면, 측면만)
         const rawFront = updatedData.find(d => d.mode === 'front')?.landmarks;
         const rawSide = updatedData.find(d => d.mode === 'side')?.landmarks;
-        const rawBack = updatedData.find(d => d.mode === 'back')?.landmarks;
 
         const landmarksByView = {
           front: normalizeLandmarks(rawFront),
           side: normalizeLandmarks(rawSide),
-          back: normalizeLandmarks(rawBack),
         };
 
         // ============================================================
-        // 랜드마크 저장 로그 (디버깅용)
+        // 랜드마크 저장 로그 (개발 모드 전용)
         // ============================================================
-        console.log('========================================');
-        console.log('[Analyze] 랜드마크 저장 시작');
-        console.log('========================================');
+        devLog('========================================');
+        devStateLog('Analyze', '랜드마크 저장 시작');
+        devLog('========================================');
 
         if (landmarksByView.front) {
-          console.log('[Analyze] Front landmarks:', landmarksByView.front.length, '개');
-          console.log('[Analyze] Front 샘플 (index 0):', landmarksByView.front[0]);
-          console.log('[Analyze] Front 샘플 (index 11, 좌측어깨):', landmarksByView.front[11]);
-          console.log('[Analyze] Front 샘플 (index 23, 좌측골반):', landmarksByView.front[23]);
+          devLog('[Analyze] Front landmarks:', landmarksByView.front.length, '개');
+          devLog('[Analyze] Front 샘플 (index 0):', landmarksByView.front[0]);
+          devLog('[Analyze] Front 샘플 (index 11, 좌측어깨):', landmarksByView.front[11]);
+          devLog('[Analyze] Front 샘플 (index 23, 좌측골반):', landmarksByView.front[23]);
 
           // 좌표 범위 확인 (normalized: 0~1, world: 미터 단위)
           const sampleX = landmarksByView.front[11]?.x || 0;
           if (sampleX >= 0 && sampleX <= 1) {
-            console.log('[Analyze] 좌표 타입: NORMALIZED (0~1 범위)');
+            devLog('[Analyze] 좌표 타입: NORMALIZED (0~1 범위)');
           } else {
-            console.log('[Analyze] 좌표 타입: WORLD (미터 단위)');
+            devLog('[Analyze] 좌표 타입: WORLD (미터 단위)');
           }
         } else {
-          console.log('[Analyze] Front landmarks: 없음');
+          devLog('[Analyze] Front landmarks: 없음');
         }
 
         if (landmarksByView.side) {
-          console.log('[Analyze] Side landmarks:', landmarksByView.side.length, '개');
+          devLog('[Analyze] Side landmarks:', landmarksByView.side.length, '개');
         } else {
-          console.log('[Analyze] Side landmarks: 없음');
+          devLog('[Analyze] Side landmarks: 없음');
         }
 
-        if (landmarksByView.back) {
-          console.log('[Analyze] Back landmarks:', landmarksByView.back.length, '개');
-        } else {
-          console.log('[Analyze] Back landmarks: 없음');
-        }
-
-        console.log('========================================');
+        devLog('========================================');
 
         // 랜드마크 데이터를 store에 저장 (3D 스켈레톤 시각화용)
         setLandmarks(landmarksByView);
-        console.log('[Analyze] Store에 랜드마크 저장 완료');
+        devStateLog('Analyze', 'Store에 랜드마크 저장 완료');
 
         const analysisRecord = {
           id: Date.now().toString(),
@@ -642,8 +626,8 @@ export default function AnalyzePage() {
               className="
                 px-4 py-2
                 rounded-xl
-                bg-[#1428A0]
-                shadow-lg shadow-[#1428A0]/30
+                bg-blue-500
+                shadow-lg shadow-blue-500/30
               "
             >
               <span className="text-white font-semibold text-sm">
@@ -661,7 +645,7 @@ export default function AnalyzePage() {
               border border-white/10
             ">
               <span className="text-white font-bold text-xs">
-                {currentModeIndex + 1}/3
+                {currentModeIndex + 1}/2
               </span>
             </div>
           </div>
@@ -702,10 +686,10 @@ export default function AnalyzePage() {
 
           {/* 코너 프레임 장식 - 전신 감지시 초록색 */}
           <div className="absolute inset-6 z-10 pointer-events-none">
-            <div className={`absolute top-0 left-0 w-10 h-10 border-t-2 border-l-2 rounded-tl-lg transition-colors duration-300 ${isFullBodyVisible ? 'border-emerald-500' : 'border-[#1428A0]/70'}`} />
-            <div className={`absolute top-0 right-0 w-10 h-10 border-t-2 border-r-2 rounded-tr-lg transition-colors duration-300 ${isFullBodyVisible ? 'border-emerald-500' : 'border-[#1428A0]/70'}`} />
-            <div className={`absolute bottom-0 left-0 w-10 h-10 border-b-2 border-l-2 rounded-bl-lg transition-colors duration-300 ${isFullBodyVisible ? 'border-emerald-500' : 'border-[#1428A0]/70'}`} />
-            <div className={`absolute bottom-0 right-0 w-10 h-10 border-b-2 border-r-2 rounded-br-lg transition-colors duration-300 ${isFullBodyVisible ? 'border-emerald-500' : 'border-[#1428A0]/70'}`} />
+            <div className={`absolute top-0 left-0 w-10 h-10 border-t-2 border-l-2 rounded-tl-lg transition-colors duration-300 ${isFullBodyVisible ? 'border-emerald-500' : 'border-blue-500/70'}`} />
+            <div className={`absolute top-0 right-0 w-10 h-10 border-t-2 border-r-2 rounded-tr-lg transition-colors duration-300 ${isFullBodyVisible ? 'border-emerald-500' : 'border-blue-500/70'}`} />
+            <div className={`absolute bottom-0 left-0 w-10 h-10 border-b-2 border-l-2 rounded-bl-lg transition-colors duration-300 ${isFullBodyVisible ? 'border-emerald-500' : 'border-blue-500/70'}`} />
+            <div className={`absolute bottom-0 right-0 w-10 h-10 border-b-2 border-r-2 rounded-br-lg transition-colors duration-300 ${isFullBodyVisible ? 'border-emerald-500' : 'border-blue-500/70'}`} />
           </div>
 
           {/* 전신 감지 피드백 메시지 */}
@@ -747,14 +731,14 @@ export default function AnalyzePage() {
                 transition={{ duration: 0.25 }}
                 className="relative"
               >
-                <div className="w-28 h-28 rounded-2xl bg-[#1428A0] flex items-center justify-center shadow-lg shadow-[#1428A0]/30">
+                <div className="w-28 h-28 rounded-2xl bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
                   <span className="text-6xl font-bold text-white">
                     {countdown}
                   </span>
                 </div>
 
                 <motion.div
-                  className="absolute inset-0 rounded-2xl border-2 border-[#1428A0]"
+                  className="absolute inset-0 rounded-2xl border-2 border-blue-500"
                   initial={{ scale: 1, opacity: 1 }}
                   animate={{ scale: 1.4, opacity: 0 }}
                   transition={{ duration: 0.7, repeat: Infinity }}
@@ -792,7 +776,7 @@ export default function AnalyzePage() {
             >
               <div className="text-center">
                 <motion.div
-                  className="w-14 h-14 border-4 border-[#1428A0] border-t-transparent rounded-full mx-auto mb-4"
+                  className="w-14 h-14 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                 />
@@ -826,7 +810,7 @@ export default function AnalyzePage() {
                       relative px-5 py-2.5 rounded-xl text-sm font-semibold
                       transition-all duration-300
                       ${isActive
-                        ? 'bg-[#1428A0] text-white shadow-lg shadow-[#1428A0]/30'
+                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
                         : isCaptured
                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                           : 'bg-white/10 text-white/70 border border-white/10'
@@ -896,7 +880,7 @@ export default function AnalyzePage() {
                       ${isCaptured
                         ? 'bg-emerald-400'
                         : isActive
-                          ? 'bg-[#1428A0]'
+                          ? 'bg-blue-500'
                           : 'bg-white/30'
                       }
                     `}

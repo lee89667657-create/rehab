@@ -13,9 +13,11 @@
  * ## 타겟 조건 (targetCondition)
  * - forward_head: 거북목
  * - round_shoulder: 라운드숄더
- * - pelvis_tilt: 골반 틀어짐
- * - knee_alignment: 무릎 정렬
+ * - pelvis_tilt: 골반 틀어짐 (추후 활성화)
+ * - knee_alignment: 무릎 정렬 (추후 활성화)
  */
+
+import { LOWER_BODY_ANALYSIS_ENABLED } from './features';
 
 /**
  * 운동 데이터 타입 정의
@@ -42,8 +44,8 @@ export interface ExerciseData {
    * 타겟 조건 (어떤 자세 문제를 개선하는가)
    * - forward_head: 거북목
    * - round_shoulder: 라운드숄더
-   * - pelvis_tilt: 골반 틀어짐
-   * - knee_alignment: 무릎 정렬
+   * - pelvis_tilt: 골반 틀어짐 (추후 활성화)
+   * - knee_alignment: 무릎 정렬 (추후 활성화)
    */
   targetCondition: 'forward_head' | 'round_shoulder' | 'pelvis_tilt' | 'knee_alignment';
 
@@ -182,7 +184,9 @@ export const exercises: ExerciseData[] = [
   },
 
   // ========================================
+  // [하체 분석 - 추후 활성화 예정]
   // 골반 틀어짐(Pelvis Tilt) 개선 운동
+  // features.ts의 LOWER_BODY_ANALYSIS_ENABLED로 제어
   // ========================================
   {
     id: 'hip-flexor-stretch',
@@ -222,7 +226,9 @@ export const exercises: ExerciseData[] = [
   },
 
   // ========================================
+  // [하체 분석 - 추후 활성화 예정]
   // 무릎 정렬(Knee Alignment) 개선 운동
+  // features.ts의 LOWER_BODY_ANALYSIS_ENABLED로 제어
   // ========================================
   {
     id: 'quad-stretch',
@@ -263,10 +269,10 @@ export const exercises: ExerciseData[] = [
 ];
 
 /**
- * 운동 프로그램 목록
+ * 전체 운동 프로그램 목록 (하체 포함)
  * 조건별로 그룹화된 운동 세트
  */
-export const exercisePrograms: ExerciseProgram[] = [
+const allExercisePrograms: ExerciseProgram[] = [
   {
     id: 'forward-head-program',
     name: '거북목 개선 프로그램',
@@ -285,6 +291,7 @@ export const exercisePrograms: ExerciseProgram[] = [
     estimatedMinutes: 10,
     level: '초급',
   },
+  // [하체 분석 - 추후 활성화 예정] features.ts의 LOWER_BODY_ANALYSIS_ENABLED로 제어
   {
     id: 'pelvis-program',
     name: '골반 교정 프로그램',
@@ -304,6 +311,17 @@ export const exercisePrograms: ExerciseProgram[] = [
     level: '초급',
   },
 ];
+
+/**
+ * 활성화된 운동 프로그램만 필터링
+ * features.ts의 LOWER_BODY_ANALYSIS_ENABLED 설정에 따라 하체 프로그램 포함 여부 결정
+ */
+export const exercisePrograms: ExerciseProgram[] = allExercisePrograms.filter((program) => {
+  if (program.targetCondition === 'pelvis_tilt' || program.targetCondition === 'knee_alignment') {
+    return LOWER_BODY_ANALYSIS_ENABLED;
+  }
+  return true;
+});
 
 /**
  * ID로 운동 찾기

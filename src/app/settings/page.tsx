@@ -1,5 +1,5 @@
 /**
- * 설정 페이지 - 삼성 헬스케어 스타일
+ * 설정 페이지 - Calm 스타일
  *
  * 앱 설정 및 계정 관리 페이지입니다.
  * 실제 동작하는 토글, 모달, 설정 기능을 제공합니다.
@@ -82,7 +82,7 @@ function ToggleSwitch({ enabled, onToggle }: ToggleSwitchProps) {
       className={`
         relative w-12 h-7 rounded-full
         transition-colors duration-300
-        ${enabled ? 'bg-[#1428A0]' : 'bg-[#E5E8EB]'}
+        ${enabled ? 'bg-blue-500' : 'bg-gray-200'}
       `}
     >
       <div
@@ -152,18 +152,18 @@ function Modal({ isOpen, onClose, title, children }: ModalProps) {
             "
           >
             {/* 헤더 */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E8EB]">
-              <h3 className="text-lg font-bold text-[#1A1A1A]">{title}</h3>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
               <button
                 onClick={onClose}
                 className="
                   w-8 h-8 rounded-lg
-                  bg-[#F8F9FA] hover:bg-[#E5E8EB]
+                  bg-gray-50 hover:bg-gray-100
                   flex items-center justify-center
                   transition-colors duration-300
                 "
               >
-                <X className="w-5 h-5 text-[#666666]" />
+                <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
 
@@ -197,17 +197,17 @@ function SettingToggleItem({ icon, label, description, enabled, onToggle }: Sett
         w-full flex items-center justify-between
         px-4 py-4
         bg-white
-        border-b border-[#E5E8EB] last:border-b-0
+        border-b border-gray-100 last:border-b-0
       "
     >
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-[#E8F0FE] flex items-center justify-center">
+        <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
           {icon}
         </div>
         <div>
-          <span className="font-medium text-[#1A1A1A]">{label}</span>
+          <span className="font-medium text-gray-800">{label}</span>
           {description && (
-            <p className="text-xs text-[#999999] mt-0.5">{description}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{description}</p>
           )}
         </div>
       </div>
@@ -236,16 +236,16 @@ function SettingItem({ icon, label, value, onClick, danger }: SettingItemProps) 
         w-full flex items-center justify-between
         px-4 py-4
         bg-white
-        hover:bg-[#F8F9FA]
+        hover:bg-gray-50
         transition-colors duration-300
-        border-b border-[#E5E8EB] last:border-b-0
-        ${danger ? 'text-red-500' : 'text-[#1A1A1A]'}
+        border-b border-gray-100 last:border-b-0
+        ${danger ? 'text-red-500' : 'text-gray-800'}
       `}
     >
       <div className="flex items-center gap-3">
         <div className={`
           w-9 h-9 rounded-xl
-          ${danger ? 'bg-red-50' : 'bg-[#E8F0FE]'}
+          ${danger ? 'bg-red-50' : 'bg-blue-50'}
           flex items-center justify-center
         `}>
           {icon}
@@ -255,9 +255,9 @@ function SettingItem({ icon, label, value, onClick, danger }: SettingItemProps) 
 
       <div className="flex items-center gap-2">
         {value && (
-          <span className="text-sm text-[#999999]">{value}</span>
+          <span className="text-sm text-gray-400">{value}</span>
         )}
-        <ChevronRight className="w-5 h-5 text-[#CCCCCC]" />
+        <ChevronRight className="w-5 h-5 text-gray-300" />
       </div>
     </button>
   );
@@ -275,13 +275,13 @@ interface SettingGroupProps {
 function SettingGroup({ title, children }: SettingGroupProps) {
   return (
     <motion.div variants={itemVariants} className="mb-6">
-      <h2 className="text-sm font-semibold text-[#666666] px-4 mb-2">
+      <h2 className="text-sm font-semibold text-gray-500 px-4 mb-2">
         {title}
       </h2>
       <div className="
         bg-white
-        rounded-2xl
-        border border-[#E5E8EB]
+        rounded-xl
+        border border-gray-100
         shadow-sm
         overflow-hidden
       ">
@@ -427,15 +427,15 @@ export default function SettingsPage() {
       {/* 앱 공통 헤더 */}
       <AppHeader />
 
-      <div className="min-h-screen bg-[#F8F9FA] pb-24 pt-14">
+      <div className="min-h-screen bg-slate-50 pb-24 pt-14">
         {/* 페이지 헤더 */}
         <motion.div
-          className="bg-white px-5 py-6 border-b border-[#E5E8EB]"
+          className="bg-white px-5 py-6 border-b border-gray-100"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">설정</h1>
-          <p className="text-sm text-[#666666] mt-1">
+          <h1 className="text-xl font-semibold text-gray-800">설정</h1>
+          <p className="text-sm text-gray-500 mt-1">
             앱 설정을 관리하세요
           </p>
         </motion.div>
@@ -450,22 +450,22 @@ export default function SettingsPage() {
           {/* 프로필 카드 */}
           <motion.div
             variants={itemVariants}
-            className="bg-white rounded-2xl p-5 mb-6 border border-[#E5E8EB] shadow-sm"
+            className="bg-white rounded-xl p-5 mb-6 border border-gray-100 shadow-sm"
           >
             <div className="flex items-center gap-4">
               <div className="
-                w-16 h-16 rounded-2xl
-                bg-gradient-to-br from-[#1428A0] to-[#0D1B6B]
+                w-16 h-16 rounded-xl
+                bg-blue-500
                 flex items-center justify-center
-                shadow-lg shadow-[#1428A0]/20
+                shadow-lg shadow-blue-500/20
               ">
                 <span className="text-2xl font-bold text-white">
                   {userName.charAt(0).toUpperCase()}
                 </span>
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-[#1A1A1A]">{userName}</h3>
-                <p className="text-sm text-[#666666] flex items-center gap-1.5 mt-0.5">
+                <h3 className="text-lg font-semibold text-gray-800">{userName}</h3>
+                <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-0.5">
                   <Mail className="w-3.5 h-3.5" />
                   {userEmail}
                 </p>
@@ -476,14 +476,14 @@ export default function SettingsPage() {
           {/* 알림 설정 */}
           <SettingGroup title="알림">
             <SettingToggleItem
-              icon={<Bell className="w-5 h-5 text-[#1428A0]" />}
+              icon={<Bell className="w-5 h-5 text-blue-500" />}
               label="푸시 알림"
               description="앱 알림을 받습니다"
               enabled={pushEnabled}
               onToggle={handleTogglePush}
             />
             <SettingToggleItem
-              icon={<Smartphone className="w-5 h-5 text-[#1428A0]" />}
+              icon={<Smartphone className="w-5 h-5 text-blue-500" />}
               label="운동 리마인더"
               description={reminderEnabled ? `매일 ${reminderTime}` : '꺼짐'}
               enabled={reminderEnabled}
@@ -494,10 +494,10 @@ export default function SettingsPage() {
                 onClick={() => setShowReminderModal(true)}
                 className="
                   w-full px-4 py-3
-                  bg-[#F8F9FA]
-                  text-sm text-[#1428A0] font-medium
+                  bg-gray-50
+                  text-sm text-blue-500 font-medium
                   text-left
-                  hover:bg-[#E8F0FE]
+                  hover:bg-blue-50
                   transition-colors duration-300
                 "
               >
@@ -509,18 +509,18 @@ export default function SettingsPage() {
           {/* 앱 설정 */}
           <SettingGroup title="앱">
             <SettingItem
-              icon={<Moon className="w-5 h-5 text-[#1428A0]" />}
+              icon={<Moon className="w-5 h-5 text-blue-500" />}
               label="다크 모드"
               value={darkModeLabels[darkMode]}
               onClick={() => setShowDarkModeModal(true)}
             />
             <SettingItem
-              icon={<Shield className="w-5 h-5 text-[#1428A0]" />}
+              icon={<Shield className="w-5 h-5 text-blue-500" />}
               label="개인정보 처리방침"
               onClick={() => setShowPrivacyModal(true)}
             />
             <SettingItem
-              icon={<Info className="w-5 h-5 text-[#1428A0]" />}
+              icon={<Info className="w-5 h-5 text-blue-500" />}
               label="앱 정보"
               value="v1.0.0"
               onClick={() => setShowAppInfoModal(true)}
@@ -530,7 +530,7 @@ export default function SettingsPage() {
           {/* 계정 */}
           <SettingGroup title="계정">
             <SettingItem
-              icon={<User className="w-5 h-5 text-[#1428A0]" />}
+              icon={<User className="w-5 h-5 text-blue-500" />}
               label="계정 관리"
               onClick={() => setShowAccountModal(true)}
             />
@@ -544,8 +544,8 @@ export default function SettingsPage() {
 
           {/* 앱 버전 정보 */}
           <motion.div variants={itemVariants} className="text-center py-8">
-            <p className="text-sm text-[#999999]">PostureAI v1.0.0</p>
-            <p className="text-xs text-[#CCCCCC] mt-1">
+            <p className="text-sm text-gray-400">PostureAI v1.0.0</p>
+            <p className="text-xs text-gray-300 mt-1">
               © 2024 PostureAI. All rights reserved.
             </p>
           </motion.div>
@@ -572,8 +572,8 @@ export default function SettingsPage() {
                 flex items-center justify-between
                 transition-colors duration-300
                 ${time === reminderTime
-                  ? 'bg-[#1428A0] text-white'
-                  : 'bg-[#F8F9FA] text-[#1A1A1A] hover:bg-[#E8F0FE]'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-50 text-gray-800 hover:bg-blue-50'
                 }
               `}
             >
@@ -600,8 +600,8 @@ export default function SettingsPage() {
                 flex items-center justify-between
                 transition-colors duration-300
                 ${mode === darkMode
-                  ? 'bg-[#1428A0] text-white'
-                  : 'bg-[#F8F9FA] text-[#1A1A1A] hover:bg-[#E8F0FE]'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-50 text-gray-800 hover:bg-blue-50'
                 }
               `}
             >
@@ -610,7 +610,7 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
-        <p className="text-xs text-[#999999] mt-4">
+        <p className="text-xs text-gray-400 mt-4">
           * 다크 모드 기능은 추후 업데이트 예정입니다.
         </p>
       </Modal>
@@ -621,24 +621,24 @@ export default function SettingsPage() {
         onClose={() => setShowPrivacyModal(false)}
         title="개인정보 처리방침"
       >
-        <div className="text-sm text-[#666666] space-y-4 leading-relaxed">
+        <div className="text-sm text-gray-500 space-y-4 leading-relaxed">
           <p>
-            <strong className="text-[#1A1A1A]">1. 수집하는 개인정보</strong>
+            <strong className="text-gray-800">1. 수집하는 개인정보</strong>
             <br />
             PostureAI는 서비스 제공을 위해 이메일, 이름, 자세 분석 데이터를 수집합니다.
           </p>
           <p>
-            <strong className="text-[#1A1A1A]">2. 개인정보의 이용 목적</strong>
+            <strong className="text-gray-800">2. 개인정보의 이용 목적</strong>
             <br />
             수집된 정보는 자세 분석, 맞춤 운동 추천, 서비스 개선에 활용됩니다.
           </p>
           <p>
-            <strong className="text-[#1A1A1A]">3. 개인정보의 보관 기간</strong>
+            <strong className="text-gray-800">3. 개인정보의 보관 기간</strong>
             <br />
             회원 탈퇴 시 즉시 파기되며, 관련 법령에 따라 일정 기간 보관이 필요한 경우 해당 기간 동안 보관됩니다.
           </p>
           <p>
-            <strong className="text-[#1A1A1A]">4. 문의</strong>
+            <strong className="text-gray-800">4. 문의</strong>
             <br />
             개인정보 관련 문의: privacy@postureai.com
           </p>
@@ -656,21 +656,21 @@ export default function SettingsPage() {
           {/* 앱 아이콘 (이모지 대신 Lucide 아이콘) */}
           <div className="
             w-20 h-20 mx-auto mb-4
-            bg-gradient-to-br from-[#1428A0] to-[#0D1B6B]
-            rounded-2xl
+            bg-blue-500
+            rounded-xl
             flex items-center justify-center
-            shadow-lg shadow-[#1428A0]/20
+            shadow-lg shadow-blue-500/20
           ">
             <Activity className="w-10 h-10 text-white" />
           </div>
 
-          <h3 className="text-xl font-bold text-[#1A1A1A]">PostureAI</h3>
-          <p className="text-sm text-[#666666] mt-1">버전 1.0.0</p>
+          <h3 className="text-xl font-semibold text-gray-800">PostureAI</h3>
+          <p className="text-sm text-gray-500 mt-1">버전 1.0.0</p>
 
-          <div className="mt-6 pt-6 border-t border-[#E5E8EB] text-sm text-[#666666] space-y-2">
+          <div className="mt-6 pt-6 border-t border-gray-100 text-sm text-gray-500 space-y-2">
             <p>AI 기반 자세 분석 서비스</p>
             <p>MediaPipe 기술을 활용한 정확한 자세 측정</p>
-            <p className="text-xs text-[#999999] mt-4">
+            <p className="text-xs text-gray-400 mt-4">
               © 2024 PostureAI. All rights reserved.
             </p>
           </div>
@@ -685,9 +685,9 @@ export default function SettingsPage() {
       >
         <div className="space-y-3">
           {/* 이메일 정보 */}
-          <div className="p-4 bg-[#F8F9FA] rounded-xl">
-            <p className="text-xs text-[#999999] mb-1">로그인 이메일</p>
-            <p className="font-medium text-[#1A1A1A]">{userEmail}</p>
+          <div className="p-4 bg-gray-50 rounded-xl">
+            <p className="text-xs text-gray-400 mb-1">로그인 이메일</p>
+            <p className="font-medium text-gray-800">{userEmail}</p>
           </div>
 
           {/* 비밀번호 변경 */}
@@ -697,8 +697,8 @@ export default function SettingsPage() {
             }}
             className="
               w-full px-4 py-3 rounded-xl
-              bg-[#F8F9FA] hover:bg-[#E8F0FE]
-              text-[#1A1A1A] font-medium
+              bg-gray-50 hover:bg-blue-50
+              text-gray-800 font-medium
               text-left
               transition-colors duration-300
             "
@@ -757,10 +757,10 @@ export default function SettingsPage() {
             <Trash2 className="w-8 h-8 text-red-500" />
           </div>
 
-          <p className="text-[#1A1A1A] font-medium mb-2">
+          <p className="text-gray-800 font-medium mb-2">
             정말 계정을 삭제하시겠습니까?
           </p>
-          <p className="text-sm text-[#666666] mb-6">
+          <p className="text-sm text-gray-500 mb-6">
             모든 데이터가 영구적으로 삭제되며
             <br />
             복구할 수 없습니다.
@@ -771,8 +771,8 @@ export default function SettingsPage() {
               onClick={() => setShowDeleteConfirm(false)}
               className="
                 flex-1 py-3 rounded-xl
-                bg-[#F8F9FA] hover:bg-[#E5E8EB]
-                text-[#666666] font-medium
+                bg-gray-100 hover:bg-gray-200
+                text-gray-500 font-medium
                 transition-colors duration-300
               "
             >

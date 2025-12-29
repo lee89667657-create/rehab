@@ -34,10 +34,13 @@ import {
 } from 'lucide-react';
 import {
   getCountableExerciseById,
+  getTimerExerciseById,
   type CountableExercise,
+  type TimerExercise as TimerExerciseType,
   type ExerciseResult,
 } from '@/lib/exerciseData';
 import RealTimeExercise from '@/components/exercise/RealTimeExercise';
+import TimerExercise from '@/components/exercise/TimerExercise';
 import AppHeader from '@/components/layout/AppHeader';
 
 // shadcn/ui 컴포넌트
@@ -61,7 +64,8 @@ export default function RealTimeExercisePage() {
 
   const exerciseId = params.id as string;
 
-  const [exercise, setExercise] = useState<CountableExercise | null>(null);
+  const [exercise, setExercise] = useState<CountableExercise | TimerExerciseType | null>(null);
+  const [exerciseType, setExerciseType] = useState<'countable' | 'timer' | null>(null);
   const [pageState, setPageState] = useState<PageState>('info');
   const [result, setResult] = useState<ExerciseResult | null>(null);
 
@@ -70,9 +74,19 @@ export default function RealTimeExercisePage() {
   // ========================================
 
   useEffect(() => {
-    const data = getCountableExerciseById(exerciseId);
-    if (data) {
-      setExercise(data);
+    // 먼저 카운팅 운동에서 검색
+    const countableData = getCountableExerciseById(exerciseId);
+    if (countableData) {
+      setExercise(countableData);
+      setExerciseType('countable');
+      return;
+    }
+
+    // 타이머 운동에서 검색
+    const timerData = getTimerExerciseById(exerciseId);
+    if (timerData) {
+      setExercise(timerData);
+      setExerciseType('timer');
     }
   }, [exerciseId]);
 
@@ -135,9 +149,21 @@ export default function RealTimeExercisePage() {
   // ========================================
 
   if (pageState === 'exercising') {
+    // 타이머 기반 운동
+    if (exerciseType === 'timer') {
+      return (
+        <TimerExercise
+          exercise={exercise as TimerExerciseType}
+          onComplete={handleComplete}
+          onCancel={handleCancel}
+        />
+      );
+    }
+
+    // 카운팅 기반 운동
     return (
       <RealTimeExercise
-        exercise={exercise}
+        exercise={exercise as CountableExercise}
         onComplete={handleComplete}
         onCancel={handleCancel}
       />
@@ -320,12 +346,20 @@ export default function RealTimeExercisePage() {
             <div className="flex items-center gap-1.5">
               <Clock className="w-4 h-4" />
               <span className="text-sm">
-                약 {Math.round((exercise.duration * exercise.sets + exercise.restTime * (exercise.sets - 1)) / 60)}분
+                {exerciseType === 'timer'
+                  ? `약 ${Math.round(((exercise as TimerExerciseType).holdTime * exercise.sets + exercise.restTime * (exercise.sets - 1)) / 60)}분`
+                  : `약 ${Math.round(((exercise as CountableExercise).duration * exercise.sets + exercise.restTime * (exercise.sets - 1)) / 60)}분`
+                }
               </span>
             </div>
             <div className="flex items-center gap-1.5">
               <Target className="w-4 h-4" />
-              <span className="text-sm">{exercise.sets}세트 x {exercise.reps}회</span>
+              <span className="text-sm">
+                {exerciseType === 'timer'
+                  ? `${exercise.sets}세트 x ${(exercise as TimerExerciseType).holdTime}초 유지`
+                  : `${exercise.sets}세트 x ${(exercise as CountableExercise).reps}회`
+                }
+              </span>
             </div>
             <div className="flex items-center gap-1.5">
               <Zap className="w-4 h-4" />
@@ -344,10 +378,14 @@ export default function RealTimeExercisePage() {
                   <Camera className="w-5 h-5 text-primary-foreground" />
                 </div>
                 <div>
-                  <h3 className="font-semibold mb-1">실시간 분석 모드</h3>
+                  <h3 className="font-semibold mb-1">
+                    {exerciseType === 'timer' ? '타이머 모드' : '실시간 분석 모드'}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
-                    카메라로 자세를 분석하고 자동으로 횟수를 카운팅합니다.
-                    전신이 보이도록 카메라 위치를 조정해주세요.
+                    {exerciseType === 'timer'
+                      ? `카메라로 자세를 확인하면서 ${(exercise as TimerExerciseType).holdTime}초간 자세를 유지합니다. 음성 안내에 따라 운동하세요.`
+                      : '카메라로 자세를 분석하고 자동으로 횟수를 카운팅합니다. 전신이 보이도록 카메라 위치를 조정해주세요.'
+                    }
                   </p>
                 </div>
               </div>
@@ -388,8 +426,15 @@ export default function RealTimeExercisePage() {
                   <p className="text-xl font-bold">{exercise.sets}세트</p>
                 </div>
                 <div className="bg-muted rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">반복</p>
-                  <p className="text-xl font-bold">{exercise.reps}회</p>
+                  <p className="text-xs text-muted-foreground">
+                    {exerciseType === 'timer' ? '유지 시간' : '반복'}
+                  </p>
+                  <p className="text-xl font-bold">
+                    {exerciseType === 'timer'
+                      ? `${(exercise as TimerExerciseType).holdTime}초`
+                      : `${(exercise as CountableExercise).reps}회`
+                    }
+                  </p>
                 </div>
                 <div className="bg-muted rounded-lg p-3">
                   <p className="text-xs text-muted-foreground">휴식</p>
@@ -426,7 +471,7 @@ export default function RealTimeExercisePage() {
             onClick={() => setPageState('exercising')}
           >
             <Camera className="w-5 h-5 mr-2" />
-            실시간 분석 시작하기
+            {exerciseType === 'timer' ? '타이머 운동 시작하기' : '실시간 분석 시작하기'}
           </Button>
         </div>
       </div>

@@ -1,5 +1,5 @@
 /**
- * 분석 결과 페이지 - shadcn/ui 스타일
+ * 분석 결과 페이지 - Calm 스타일
  */
 
 'use client';
@@ -39,6 +39,7 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { saveAnalysisResult, type AnalysisResultRow } from '@/lib/supabase';
 import type { AnalysisItem } from '@/lib/poseAnalysis';
 import AppHeader from '@/components/layout/AppHeader';
+import { devLog } from '@/lib/logger';
 
 // 질환 위험도 분석 모듈
 import {
@@ -104,6 +105,8 @@ interface PostureType {
 // 상수 및 매핑 데이터
 // ============================================================
 
+import { filterEnabledItems, LOWER_BODY_ANALYSIS_ENABLED } from '@/constants/features';
+
 const itemDetails: Record<string, { detail: string; recommendation: string; bodyPart: string; normalRange: string }> = {
   forward_head: {
     detail: '귀와 어깨 사이의 거리를 측정했습니다.',
@@ -117,6 +120,7 @@ const itemDetails: Record<string, { detail: string; recommendation: string; body
     bodyPart: 'shoulder',
     normalRange: '0 ~ 1cm',
   },
+  // [하체 분석 - 추후 활성화 예정] features.ts의 ANALYSIS_FEATURES로 제어
   pelvis_tilt: {
     detail: '좌우 골반 높이 차이를 측정했습니다.',
     recommendation: '골반 교정 운동',
@@ -218,7 +222,8 @@ const DUMMY_LANDMARKS_SIDE: Array<{ x: number; y: number; z: number; visibility:
     };
   });
 
-const DUMMY_RESULTS: ExtendedAnalysisItem[] = [
+// 전체 분석 항목 (하체 포함)
+const ALL_DUMMY_RESULTS: ExtendedAnalysisItem[] = [
   {
     id: 'forward_head',
     name: '거북목',
@@ -230,13 +235,14 @@ const DUMMY_RESULTS: ExtendedAnalysisItem[] = [
   },
   {
     id: 'shoulder_tilt',
-    name: '어깨 균형',
+    name: '라운드숄더',
     value: 1.5,
     unit: 'cm',
     grade: 'good',
     score: 92,
     description: '어깨가 균형잡혀 있어요',
   },
+  // [하체 분석 - 추후 활성화 예정] features.ts의 ANALYSIS_FEATURES로 제어
   {
     id: 'pelvis_tilt',
     name: '골반 균형',
@@ -256,6 +262,9 @@ const DUMMY_RESULTS: ExtendedAnalysisItem[] = [
     description: '무릎 정렬에 주의가 필요해요',
   },
 ];
+
+// 활성화된 분석 항목만 필터링
+const DUMMY_RESULTS = filterEnabledItems(ALL_DUMMY_RESULTS);
 
 // ============================================================
 // 애니메이션 설정
@@ -673,8 +682,8 @@ export default function ResultPage() {
 
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [expandedDiseaseId, setExpandedDiseaseId] = useState<string | null>(null);
-  // 3D 스켈레톤 뷰 전환 상태 ('front' | 'side' | 'back')
-  const [skeleton3DView, setSkeleton3DView] = useState<'front' | 'side' | 'back'>('front');
+  // 3D 스켈레톤 뷰 전환 상태 ('front' | 'side')
+  const [skeleton3DView, setSkeleton3DView] = useState<'front' | 'side'>('front');
   // 3D 모델 모드 토글 (true: GLTF 모델, false: 스틱 피겨)
   const [use3DModel, setUse3DModel] = useState<boolean>(true);
   const [isSaved, setIsSaved] = useState(false);
@@ -691,7 +700,7 @@ export default function ResultPage() {
     capturedImages?: {
       front: string | null;
       side: string | null;
-      back: string | null;
+      back?: string | null; // 하위호환용 (기존 데이터)
     };
     landmarks?: Record<string, unknown>;
     items?: ExtendedAnalysisItem[];
@@ -727,7 +736,7 @@ export default function ResultPage() {
   const historyResults: ExtendedAnalysisItem[] = useMemo(() => {
     // Supabase 기록인 경우
     if (historyRecord) {
-      return [
+      const allItems: ExtendedAnalysisItem[] = [
         {
           id: 'forward_head',
           name: '거북목',
@@ -739,13 +748,14 @@ export default function ResultPage() {
         },
         {
           id: 'shoulder_tilt',
-          name: '어깨 균형',
+          name: '라운드숄더',
           value: Math.round((100 - historyRecord.shoulder_balance) / 20),
           unit: 'cm',
           grade: historyRecord.shoulder_balance >= 80 ? 'good' : historyRecord.shoulder_balance >= 60 ? 'warning' : 'danger',
           score: historyRecord.shoulder_balance,
           description: historyRecord.shoulder_balance >= 80 ? '균형이 좋습니다' : '주의가 필요합니다',
         },
+        // [하체 분석 - 추후 활성화 예정] features.ts의 ANALYSIS_FEATURES로 제어
         {
           id: 'pelvis_tilt',
           name: '골반 균형',
@@ -765,6 +775,8 @@ export default function ResultPage() {
           description: historyRecord.knee_alignment >= 80 ? '정렬이 좋습니다' : '주의가 필요합니다',
         },
       ];
+      // 활성화된 분석 항목만 필터링
+      return filterEnabledItems(allItems);
     }
     // localStorage 기록인 경우
     if (localHistoryRecord?.items) {
@@ -797,10 +809,7 @@ export default function ResultPage() {
   // 2. 새 분석인 경우: store의 storedLandmarks 사용
   // 3. 데이터 없는 경우: 테스트용 더미 데이터 사용
 
-  // 데이터 소스 타입 (UI 표시용)
-  type LandmarkSource = 'history' | 'realtime' | 'demo';
-
-  const { displayLandmarks, landmarkSource } = useMemo(() => {
+  const { displayLandmarks } = useMemo(() => {
     // 1. 히스토리에서 온 경우
     if (isFromHistory && localHistoryRecord?.landmarks) {
       const lm = localHistoryRecord.landmarks as {
@@ -809,92 +818,32 @@ export default function ResultPage() {
         back?: Array<{ x: number; y: number; z: number; visibility: number }> | null;
       };
 
-      // 디버깅 로그
-      console.log('[Skeleton3D] Data source: HISTORY');
-      console.log('[Skeleton3D] Front landmarks:', lm.front?.length || 0, 'points');
-      console.log('[Skeleton3D] Side landmarks:', lm.side?.length || 0, 'points');
-      console.log('[Skeleton3D] Back landmarks:', lm.back?.length || 0, 'points');
+      // 디버깅 로그 (개발 모드 전용)
+      devLog('[Skeleton3D] Data source: HISTORY');
+      devLog('[Skeleton3D] Front landmarks:', lm.front?.length || 0, 'points');
+      devLog('[Skeleton3D] Side landmarks:', lm.side?.length || 0, 'points');
 
       return {
         displayLandmarks: {
           front: lm.front || null,
           side: lm.side || null,
-          back: lm.back || null,
         },
-        landmarkSource: 'history' as LandmarkSource,
       };
     }
 
     // 2. store에 저장된 랜드마크가 있는 경우 (실시간 촬영 데이터)
-    if (storedLandmarks.front || storedLandmarks.side || storedLandmarks.back) {
-      // ============================================================
-      // 랜드마크 검증 및 디버깅 로그
-      // ============================================================
-      console.log('========================================');
-      console.log('[Result] 랜드마크 검증 시작');
-      console.log('[Result] Data source: REALTIME (from camera capture)');
-      console.log('========================================');
-
-      // 각 뷰별 검증
-      const validateLandmarks = (
-        landmarks: typeof storedLandmarks.front,
-        viewName: string
-      ) => {
-        if (!landmarks) {
-          console.log(`[Result] ${viewName}: 없음`);
-          return false;
-        }
-
-        const count = landmarks.length;
-        const isValid = count === 33;
-
-        console.log(`[Result] ${viewName}: ${count}개 ${isValid ? '(OK)' : '(INVALID - expected 33)'}`);
-
-        if (landmarks[0]) {
-          console.log(`[Result] ${viewName} 샘플 (index 0):`, {
-            x: landmarks[0].x?.toFixed(4) ?? 'undefined',
-            y: landmarks[0].y?.toFixed(4) ?? 'undefined',
-            z: landmarks[0].z?.toFixed(4) ?? 'undefined',
-            visibility: landmarks[0].visibility?.toFixed(2) ?? 'undefined',
-          });
-        }
-
-        // 좌표 타입 확인
-        if (landmarks[11]) {
-          const sampleX = landmarks[11].x;
-          if (sampleX >= 0 && sampleX <= 1) {
-            console.log(`[Result] ${viewName} 좌표 타입: NORMALIZED (0~1)`);
-          } else {
-            console.log(`[Result] ${viewName} 좌표 타입: WORLD (미터 단위)`);
-          }
-        }
-
-        return isValid;
-      };
-
-      validateLandmarks(storedLandmarks.front, 'Front');
-      validateLandmarks(storedLandmarks.side, 'Side');
-      validateLandmarks(storedLandmarks.back, 'Back');
-
-      console.log('========================================');
-
+    if (storedLandmarks.front || storedLandmarks.side) {
       return {
         displayLandmarks: storedLandmarks,
-        landmarkSource: 'realtime' as LandmarkSource,
       };
     }
 
     // 3. 데이터가 없는 경우 테스트용 더미 데이터 반환
-    console.log('[Skeleton3D] Data source: DEMO (no real data available)');
-    console.log('[Skeleton3D] Using dummy landmarks for visualization');
-
     return {
       displayLandmarks: {
         front: DUMMY_LANDMARKS,
         side: DUMMY_LANDMARKS_SIDE,
-        back: DUMMY_LANDMARKS, // 후면은 정면과 동일하게 사용
       },
-      landmarkSource: 'demo' as LandmarkSource,
     };
   }, [isFromHistory, localHistoryRecord, storedLandmarks]);
 
@@ -1039,18 +988,18 @@ export default function ResultPage() {
       };
     }
 
-    // 불균형 자세 - Scale 아이콘
+    // 라운드숄더/불균형 자세 - Scale 아이콘
     if (shoulderItem && shoulderItem.value > 2) {
       return {
-        name: '불균형 자세',
-        description: '좌우 균형이 맞지 않는 자세입니다.',
-        features: ['어깨 높이 차이', '척추 측만 가능성', '골반 틀어짐', '다리 길이 차이'],
+        name: '라운드숄더',
+        description: '어깨가 앞으로 말린 자세입니다.',
+        features: ['어깨 전방 이동', '등 상부 긴장', '가슴 근육 단축', '호흡 제한 가능'],
         icon: Scale,
       };
     }
 
-    // O다리 경향 - Activity 아이콘
-    if (kneeItem && kneeItem.value < 170) {
+    // [하체 분석 - 추후 활성화 예정] O다리 경향 - Activity 아이콘
+    if (LOWER_BODY_ANALYSIS_ENABLED && kneeItem && kneeItem.value < 170) {
       return {
         name: 'O다리 경향',
         description: '무릎이 바깥쪽으로 휘어진 경향이 있습니다.',
@@ -1060,10 +1009,14 @@ export default function ResultPage() {
     }
 
     // 정상 자세 - Sparkles 아이콘
+    const normalFeatures = LOWER_BODY_ANALYSIS_ENABLED
+      ? ['균형 잡힌 척추', '정렬된 골반', '적절한 무릎 각도', '건강한 자세']
+      : ['바른 목 정렬', '균형잡힌 어깨', '올바른 척추 정렬', '건강한 자세'];
+
     return {
       name: '정상 자세',
       description: '전반적으로 균형 잡힌 좋은 자세입니다.',
-      features: ['균형 잡힌 척추', '정렬된 골반', '적절한 무릎 각도', '건강한 자세'],
+      features: normalFeatures,
       icon: Sparkles,
     };
   }, [results]);
@@ -1092,10 +1045,10 @@ export default function ResultPage() {
     <>
       <AppHeader />
 
-      <div className="min-h-screen bg-background pb-32 pt-14">
+      <div className="min-h-screen bg-slate-50 pb-32 pt-14">
         {/* 상단 헤더 */}
         <motion.header
-          className="bg-card px-5 pt-4 pb-4 border-b sticky top-14 z-30"
+          className="bg-white px-5 pt-4 pb-4 border-b border-gray-100 sticky top-14 z-30"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -1175,23 +1128,6 @@ export default function ResultPage() {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">측면</p>
-                  </div>
-                  {/* 후면 이미지 */}
-                  <div className="flex-shrink-0 text-center">
-                    <div className="w-28 h-36 bg-gray-200 rounded-lg overflow-hidden">
-                      {displayImages.back ? (
-                        <img
-                          src={displayImages.back}
-                          alt="후면"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
-                          이미지 없음
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">후면</p>
                   </div>
                 </div>
               </CardContent>
@@ -1355,10 +1291,10 @@ export default function ResultPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {/* 뷰 버튼 - 1세트만 */}
+                {/* 뷰 버튼 - 정면/측면만 */}
                 <div className="flex justify-center mb-4">
                   <div className="flex gap-1 bg-muted p-1 rounded-lg">
-                    {(['front', 'side', 'back'] as const).map((view) => (
+                    {(['front', 'side'] as const).map((view) => (
                       <button
                         key={view}
                         onClick={() => setSkeleton3DView(view)}
@@ -1371,7 +1307,7 @@ export default function ResultPage() {
                               : 'text-muted-foreground/40 cursor-not-allowed'
                         }`}
                       >
-                        {view.charAt(0).toUpperCase() + view.slice(1)}
+                        {view === 'front' ? '정면' : '측면'}
                       </button>
                     ))}
                   </div>
@@ -1554,13 +1490,13 @@ export default function ResultPage() {
           </motion.section>
 
           {/* ============================================================ */}
-          {/* 질환 위험도 분석 섹션 */}
+          {/* 거북목 / 라운드숄더 분석 섹션 */}
           {/* ============================================================ */}
           <motion.section variants={itemVariants} className="mt-6">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
                 <ShieldAlert className="w-5 h-5 text-primary" />
-                질환 위험도 분석
+                거북목 / 라운드숄더 분석
               </h2>
               <Badge variant={
                 diseaseRiskAnalysis.overallLevel === 'low' ? 'default' :
@@ -1577,7 +1513,7 @@ export default function ResultPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <AlertTriangle className="w-4 h-4 text-orange-500" />
-                    <span className="text-sm font-semibold text-orange-700">주요 우려 질환</span>
+                    <span className="text-sm font-semibold text-orange-700">주요 우려</span>
                   </div>
                   <p className="text-base font-bold text-foreground">
                     {diseaseRiskAnalysis.primaryConcern.name}
@@ -1589,9 +1525,9 @@ export default function ResultPage() {
               </Card>
             )}
 
-            {/* 질환별 위험도 리스트 */}
+            {/* 거북목 / 라운드숄더 위험도 카드 */}
             <div className="space-y-3">
-              {diseaseRiskAnalysis.diseases.slice(0, 4).map((disease) => (
+              {diseaseRiskAnalysis.diseases.map((disease) => (
                 <DiseaseRiskCard
                   key={disease.id}
                   disease={disease}
@@ -1757,7 +1693,7 @@ export default function ResultPage() {
         </motion.div>
 
         {/* 하단 액션 버튼 */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100">
           <div className="flex gap-3 max-w-lg mx-auto">
             <Button
               variant="outline"

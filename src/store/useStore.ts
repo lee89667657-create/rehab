@@ -40,8 +40,8 @@ interface CapturedImages {
   front: string | null;
   /** 측면 촬영 이미지 (base64) */
   side: string | null;
-  /** 후면 촬영 이미지 (base64) */
-  back: string | null;
+  /** 후면 촬영 이미지 (base64) - 하위호환용 */
+  back?: string | null;
 }
 
 /**
@@ -57,15 +57,15 @@ interface Landmark3D {
 
 /**
  * 뷰별 랜드마크 데이터 타입
- * 정면/측면/후면 각각의 33개 랜드마크 배열
+ * 정면/측면 각각의 33개 랜드마크 배열
  */
 interface LandmarksByView {
   /** 정면 촬영 시 랜드마크 (33개) */
   front: Landmark3D[] | null;
   /** 측면 촬영 시 랜드마크 (33개) */
   side: Landmark3D[] | null;
-  /** 후면 촬영 시 랜드마크 (33개) */
-  back: Landmark3D[] | null;
+  /** 후면 촬영 시 랜드마크 (33개) - 하위호환용 */
+  back?: Landmark3D[] | null;
 }
 
 /**

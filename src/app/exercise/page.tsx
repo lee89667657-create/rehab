@@ -1,5 +1,5 @@
 /**
- * 운동 프로그램 페이지 - shadcn/ui 스타일
+ * 운동 프로그램 페이지 - Calm 스타일
  */
 
 'use client';
@@ -13,7 +13,6 @@ import {
   Play,
   Zap,
   Target,
-  Flame,
   Timer,
   ChevronRight,
   Camera,
@@ -25,12 +24,12 @@ import {
   exercisePrograms,
   getExercisesForProgram,
   calculateTotalDuration,
-  type ExerciseData,
 } from '@/constants/exercises';
-import { COUNTABLE_EXERCISES, type CountableExercise } from '@/lib/exerciseData';
+import { COUNTABLE_EXERCISES, TIMER_EXERCISES, type CountableExercise, type TimerExercise as TimerExerciseType } from '@/lib/exerciseData';
 import AppHeader from '@/components/layout/AppHeader';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getLatestAnalysisResult, type AnalysisResultRow } from '@/lib/supabase';
+import { LOWER_BODY_ANALYSIS_ENABLED } from '@/constants/features';
 
 // shadcn/ui 컴포넌트
 import { Card, CardContent } from '@/components/ui/card';
@@ -62,77 +61,24 @@ const itemVariants = {
 // 상수 및 매핑 데이터
 // ============================================================
 
-const categoryLabels: Record<string, string> = {
-  stretching: '스트레칭',
-  strengthening: '근력 강화',
-  mobility: '가동성',
-};
-
-const issueToProgram: Record<string, string> = {
+// 전체 매핑 (하체 포함)
+const allIssueToProgram: Record<string, string> = {
   forward_head: 'forward_head',
   shoulder_tilt: 'round_shoulder',
+  // [하체 분석 - 추후 활성화 예정] features.ts의 LOWER_BODY_ANALYSIS_ENABLED로 제어
   pelvis_tilt: 'pelvis_tilt',
   knee_angle: 'knee_alignment',
 };
 
-// ============================================================
-// 컴포넌트: 운동 카드
-// ============================================================
-
-interface ExerciseCardProps {
-  exercise: ExerciseData;
-  index: number;
-  programId: string;
-}
-
-function ExerciseCard({ exercise, index, programId }: ExerciseCardProps) {
-  const totalTime = exercise.duration * exercise.sets;
-  const minutes = Math.floor(totalTime / 60);
-  const seconds = totalTime % 60;
-  const timeString = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
-
-  return (
-    <motion.div variants={itemVariants}>
-      <Link href={`/exercise/${exercise.id}?program=${programId}&index=${index}`}>
-        <Card className="hover:shadow-lg transition-all duration-300 group">
-          <CardContent className="p-0">
-            <div className="flex items-stretch">
-              <div className="w-16 min-h-[72px] bg-primary flex items-center justify-center flex-shrink-0 rounded-l-lg">
-                <span className="text-xl font-bold text-primary-foreground">
-                  {index + 1}
-                </span>
-              </div>
-
-              <div className="flex-1 p-4 flex items-center">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">
-                    {exercise.name}
-                  </h3>
-                  <div className="flex items-center flex-wrap gap-2">
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Timer className="w-3.5 h-3.5" />
-                      {timeString}
-                    </span>
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Flame className="w-3.5 h-3.5" />
-                      {exercise.sets}세트
-                    </span>
-                    <Badge variant="secondary" className="text-[10px]">
-                      {categoryLabels[exercise.category]}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="w-8 h-8 rounded-lg bg-muted group-hover:bg-primary/10 flex items-center justify-center flex-shrink-0 ml-3 transition-colors">
-                  <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary" />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </Link>
-    </motion.div>
-  );
-}
+// 활성화된 항목만 필터링
+const issueToProgram: Record<string, string> = Object.fromEntries(
+  Object.entries(allIssueToProgram).filter(([key]) => {
+    if (key === 'pelvis_tilt' || key === 'knee_angle') {
+      return LOWER_BODY_ANALYSIS_ENABLED;
+    }
+    return true;
+  })
+);
 
 // ============================================================
 // 컴포넌트: 실시간 분석 운동 카드
@@ -191,6 +137,62 @@ function RealtimeExerciseCard({ exercise }: RealtimeExerciseCardProps) {
 }
 
 // ============================================================
+// 컴포넌트: 타이머 운동 카드
+// ============================================================
+
+interface TimerExerciseCardProps {
+  exercise: TimerExerciseType;
+}
+
+function TimerExerciseCard({ exercise }: TimerExerciseCardProps) {
+  return (
+    <motion.div variants={itemVariants}>
+      <Link href={`/exercise/realtime/${exercise.id}`}>
+        <Card className="hover:shadow-lg transition-all duration-300 group border-purple-200 dark:border-purple-800">
+          <CardContent className="p-0">
+            <div className="flex items-stretch">
+              {/* 왼쪽 아이콘 영역 - 타이머 표시 */}
+              <div className="w-16 min-h-[72px] bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center flex-shrink-0 rounded-l-lg">
+                <Timer className="w-6 h-6 text-white" />
+              </div>
+
+              <div className="flex-1 p-4 flex items-center">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-foreground group-hover:text-purple-600 transition-colors">
+                      {exercise.name}
+                    </h3>
+                    <Badge variant="outline" className="text-[10px] border-purple-500 text-purple-600">
+                      타이머
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-1.5 line-clamp-1">
+                    {exercise.description}
+                  </p>
+                  <div className="flex items-center flex-wrap gap-2">
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="w-3.5 h-3.5" />
+                      {exercise.holdTime}초 x {exercise.sets}세트
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Zap className="w-3.5 h-3.5" />
+                      {exercise.targetDisease}
+                    </span>
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 group-hover:bg-purple-200 dark:group-hover:bg-purple-800/50 flex items-center justify-center flex-shrink-0 ml-3 transition-colors">
+                  <ChevronRight className="w-5 h-5 text-purple-600" />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+    </motion.div>
+  );
+}
+
+// ============================================================
 // 컴포넌트: 분석 안내 (분석 기록 없을 때)
 // ============================================================
 
@@ -228,6 +230,25 @@ function NoAnalysisView() {
         </Card>
       </motion.div>
 
+      {/* 타이머 운동 섹션 */}
+      <motion.div variants={itemVariants} className="mt-8">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+            <Timer className="w-4 h-4 text-purple-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">타이머 운동</h3>
+            <p className="text-xs text-muted-foreground">자세를 유지하며 시간 측정</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {TIMER_EXERCISES.map((exercise) => (
+            <TimerExerciseCard key={exercise.id} exercise={exercise} />
+          ))}
+        </div>
+      </motion.div>
+
       {/* 실시간 분석 운동 섹션 */}
       <motion.div variants={itemVariants} className="mt-8">
         <div className="flex items-center gap-2 mb-4">
@@ -241,9 +262,32 @@ function NoAnalysisView() {
         </div>
 
         <div className="space-y-3">
-          {COUNTABLE_EXERCISES.slice(0, 4).map((exercise) => (
-            <RealtimeExerciseCard key={exercise.id} exercise={exercise} />
-          ))}
+          {COUNTABLE_EXERCISES
+            .filter((ex) => ['neck-side-stretch', 'shoulder-squeeze', 'arm-raise'].includes(ex.id))
+            .map((exercise) => (
+              <RealtimeExerciseCard key={exercise.id} exercise={exercise} />
+            ))}
+        </div>
+      </motion.div>
+
+      {/* 추가 운동 섹션 */}
+      <motion.div variants={itemVariants} className="mt-8">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+            <Dumbbell className="w-4 h-4 text-orange-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">추가 운동</h3>
+            <p className="text-xs text-muted-foreground">오래 앉아있으면 하체도 약해집니다</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {COUNTABLE_EXERCISES
+            .filter((ex) => ex.id === 'squat')
+            .map((exercise) => (
+              <RealtimeExerciseCard key={exercise.id} exercise={exercise} />
+            ))}
         </div>
       </motion.div>
 
@@ -338,12 +382,24 @@ function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
     }
   };
 
-  const issueLabels: Record<string, string> = {
+  // 전체 라벨 (하체 포함)
+  const allIssueLabels: Record<string, string> = {
     forward_head: '거북목',
-    shoulder_tilt: '어깨 불균형',
+    shoulder_tilt: '라운드숄더',
+    // [하체 분석 - 추후 활성화 예정] features.ts의 LOWER_BODY_ANALYSIS_ENABLED로 제어
     pelvis_tilt: '골반 틀어짐',
     knee_angle: '무릎 정렬',
   };
+
+  // 활성화된 항목만 필터링
+  const issueLabels: Record<string, string> = Object.fromEntries(
+    Object.entries(allIssueLabels).filter(([key]) => {
+      if (key === 'pelvis_tilt' || key === 'knee_angle') {
+        return LOWER_BODY_ANALYSIS_ENABLED;
+      }
+      return true;
+    })
+  );
 
   return (
     <>
@@ -409,21 +465,23 @@ function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
           </Card>
         </motion.section>
 
-        {/* 운동 리스트 */}
+        {/* 타이머 운동 섹션 */}
         <motion.section variants={itemVariants}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-foreground">운동 순서</h3>
-            <span className="text-sm text-muted-foreground">총 {programExercises.length}개</span>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                <Timer className="w-4 h-4 text-purple-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">타이머 운동</h3>
+                <p className="text-xs text-muted-foreground">자세를 유지하며 시간 측정</p>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-3">
-            {programExercises.map((exercise, index) => (
-              <ExerciseCard
-                key={exercise.id}
-                exercise={exercise}
-                index={index}
-                programId={program.id}
-              />
+            {TIMER_EXERCISES.map((exercise) => (
+              <TimerExerciseCard key={exercise.id} exercise={exercise} />
             ))}
           </div>
         </motion.section>
@@ -443,9 +501,34 @@ function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
           </div>
 
           <div className="space-y-3">
-            {COUNTABLE_EXERCISES.slice(0, 4).map((exercise) => (
-              <RealtimeExerciseCard key={exercise.id} exercise={exercise} />
-            ))}
+            {COUNTABLE_EXERCISES
+              .filter((ex) => ['neck-side-stretch', 'shoulder-squeeze', 'arm-raise'].includes(ex.id))
+              .map((exercise) => (
+                <RealtimeExerciseCard key={exercise.id} exercise={exercise} />
+              ))}
+          </div>
+        </motion.section>
+
+        {/* 추가 운동 섹션 */}
+        <motion.section variants={itemVariants} className="mt-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                <Dumbbell className="w-4 h-4 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">추가 운동</h3>
+                <p className="text-xs text-muted-foreground">오래 앉아있으면 하체도 약해집니다</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {COUNTABLE_EXERCISES
+              .filter((ex) => ex.id === 'squat')
+              .map((exercise) => (
+                <RealtimeExerciseCard key={exercise.id} exercise={exercise} />
+              ))}
           </div>
         </motion.section>
 
@@ -464,14 +547,14 @@ function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
       </motion.div>
 
       {/* 하단 시작 버튼 */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t">
-        <Button
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100">
+        <button
           onClick={handleStartExercise}
-          className="w-full h-12 text-base font-semibold"
+          className="w-full h-12 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
         >
-          <Play className="w-5 h-5 mr-2 fill-current" />
+          <Play className="w-5 h-5 fill-current" />
           운동 시작하기
-        </Button>
+        </button>
       </div>
     </>
   );
@@ -531,15 +614,15 @@ export default function ExercisePage() {
     <>
       <AppHeader />
 
-      <div className="min-h-screen bg-background pb-24 pt-14">
+      <div className="min-h-screen bg-slate-50 pb-24 pt-14">
         {/* 페이지 헤더 */}
         <motion.div
-          className="bg-card px-5 py-6 border-b"
+          className="bg-white px-5 py-6 border-b border-gray-100"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-2xl font-bold text-foreground">맞춤 운동</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-xl font-semibold text-gray-800">맞춤 운동</h1>
+          <p className="text-sm text-gray-500 mt-1">
             AI 분석 결과에 맞는 운동을 추천해드려요
           </p>
         </motion.div>

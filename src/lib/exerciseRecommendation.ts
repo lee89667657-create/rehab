@@ -51,160 +51,77 @@ export interface ExerciseRecommendation {
 // 운동 프로그램 데이터베이스
 // ============================================================
 
+/**
+ * 구현된 운동 목록 (6개):
+ * - 타이머 운동: chin-tuck, shoulder-blade-squeeze
+ * - 실시간 분석: neck-side-stretch, shoulder-squeeze, arm-raise, squat
+ */
 const EXERCISE_PROGRAMS: ExerciseProgram[] = [
-  // 경추 디스크 관련
+  // 거북목 개선 프로그램
   {
-    id: 'neck_recovery',
-    name: '목 회복 프로그램',
-    targetDisease: '경추 디스크',
-    duration: 15,
+    id: 'turtle_neck_recovery',
+    name: '거북목 개선 프로그램',
+    targetDisease: '거북목',
+    duration: 10,
     difficulty: 'easy',
     frequency: '매일 2회',
     exercises: [
-      { id: 'chin_tuck', name: '턱 당기기', sets: 3, reps: 10, description: '턱을 뒤로 당겨 이중턱 만들기' },
-      { id: 'neck_stretch', name: '목 스트레칭', sets: 2, reps: '30초', description: '좌우로 목을 천천히 기울이기' },
-      { id: 'shoulder_roll', name: '어깨 돌리기', sets: 2, reps: 10, description: '어깨를 앞뒤로 크게 돌리기' },
-      { id: 'neck_rotation', name: '목 회전', sets: 2, reps: 10, description: '천천히 좌우로 목 돌리기' },
+      { id: 'chin-tuck', name: '턱 당기기', sets: 3, reps: '10초 유지', description: '턱을 뒤로 당겨 이중턱 만들기 (타이머)' },
+      { id: 'neck-side-stretch', name: '목 옆 스트레칭', sets: 2, reps: 8, description: '목을 옆으로 천천히 기울이기 (실시간 분석)' },
     ],
-    benefits: ['목 통증 감소', '자세 교정', '두통 완화'],
+    benefits: ['목 통증 감소', '거북목 자세 교정', '두통 완화'],
     precautions: ['급격한 동작 금지', '통증 시 즉시 중단'],
   },
-  {
-    id: 'neck_strengthening',
-    name: '목 근력 강화',
-    targetDisease: '경추 디스크',
-    duration: 20,
-    difficulty: 'medium',
-    frequency: '주 3-4회',
-    exercises: [
-      { id: 'isometric_neck', name: '등척성 목 운동', sets: 3, reps: '10초', description: '손으로 저항하며 목 힘주기' },
-      { id: 'prone_neck_lift', name: '엎드려 목 들기', sets: 2, reps: 10, description: '엎드린 상태에서 천천히 목 들기' },
-      { id: 'neck_flexion', name: '목 굴곡 운동', sets: 2, reps: 15, description: '턱을 가슴 쪽으로 당기기' },
-    ],
-    benefits: ['목 근력 향상', '디스크 압박 감소', '자세 안정성 증가'],
-    precautions: ['천천히 진행', '과도한 무게 사용 금지'],
-  },
 
-  // 오십견 관련
+  // 라운드숄더 개선 프로그램
   {
-    id: 'shoulder_mobility',
-    name: '어깨 가동성 회복',
-    targetDisease: '오십견',
-    duration: 20,
+    id: 'round_shoulder_recovery',
+    name: '라운드숄더 개선 프로그램',
+    targetDisease: '라운드숄더',
+    duration: 15,
     difficulty: 'easy',
     frequency: '매일 1-2회',
     exercises: [
-      { id: 'pendulum', name: '진자 운동', sets: 3, reps: '1분', description: '팔을 늘어뜨리고 원형으로 흔들기' },
-      { id: 'wall_climb', name: '벽 오르기', sets: 2, reps: 15, description: '손가락으로 벽을 타고 올라가기' },
-      { id: 'towel_stretch', name: '수건 스트레칭', sets: 2, reps: 10, description: '수건을 잡고 어깨 뒤로 당기기' },
-      { id: 'cross_body', name: '교차 스트레칭', sets: 2, reps: '30초', description: '팔을 반대쪽 어깨로 당기기' },
+      { id: 'shoulder-blade-squeeze', name: '견갑골 모으기', sets: 3, reps: '5초 유지', description: '양쪽 견갑골을 가깝게 모으기 (타이머)' },
+      { id: 'shoulder-squeeze', name: '어깨 으쓱하기', sets: 3, reps: 12, description: '어깨를 귀 쪽으로 올렸다 내리기 (실시간 분석)' },
+      { id: 'arm-raise', name: '팔 들어올리기', sets: 2, reps: 10, description: '양팔을 천천히 위로 들어올리기 (실시간 분석)' },
     ],
-    benefits: ['어깨 가동범위 증가', '통증 감소', '일상생활 기능 향상'],
-    precautions: ['무리한 스트레칭 금지', '따뜻하게 한 후 실시'],
+    benefits: ['어깨 자세 교정', '등 근육 강화', '가슴 열림'],
+    precautions: ['무리한 스트레칭 금지', '천천히 진행'],
   },
 
-  // 요추 디스크 관련
+  // 하체 강화 프로그램
   {
-    id: 'core_stabilization',
-    name: '코어 안정화 프로그램',
-    targetDisease: '요추 디스크',
-    duration: 25,
-    difficulty: 'medium',
-    frequency: '주 4-5회',
-    exercises: [
-      { id: 'dead_bug', name: '데드버그', sets: 3, reps: 10, description: '누워서 팔다리 교차 뻗기' },
-      { id: 'bird_dog', name: '버드독', sets: 3, reps: 10, description: '네발 자세에서 반대편 팔다리 뻗기' },
-      { id: 'pelvic_tilt', name: '골반 기울이기', sets: 3, reps: 15, description: '누워서 허리를 바닥에 붙이기' },
-      { id: 'bridge', name: '브릿지', sets: 3, reps: 12, description: '누워서 엉덩이 들어올리기' },
-    ],
-    benefits: ['코어 근력 강화', '허리 안정성 증가', '디스크 압박 감소'],
-    precautions: ['허리 과신전 금지', '통증 시 중단'],
-  },
-  {
-    id: 'back_flexibility',
-    name: '허리 유연성 프로그램',
-    targetDisease: '요추 디스크',
-    duration: 15,
-    difficulty: 'easy',
-    frequency: '매일',
-    exercises: [
-      { id: 'cat_cow', name: '고양이-소 자세', sets: 2, reps: 10, description: '네발 자세에서 등 굽히고 펴기' },
-      { id: 'child_pose', name: '아이 자세', sets: 2, reps: '30초', description: '무릎 꿇고 앞으로 엎드리기' },
-      { id: 'knee_to_chest', name: '무릎 당기기', sets: 2, reps: '30초', description: '누워서 무릎을 가슴으로 당기기' },
-    ],
-    benefits: ['허리 유연성 향상', '근육 이완', '통증 완화'],
-    precautions: ['천천히 부드럽게', '과도한 스트레칭 금지'],
-  },
-
-  // 척추측만증 관련
-  {
-    id: 'balance_correction',
-    name: '좌우 균형 교정',
-    targetDisease: '척추측만증',
-    duration: 20,
-    difficulty: 'medium',
-    frequency: '주 5회',
-    exercises: [
-      { id: 'side_plank', name: '사이드 플랭크', sets: 2, reps: '20초', description: '옆으로 누워 몸 들어올리기' },
-      { id: 'single_leg_stand', name: '한발 서기', sets: 3, reps: '30초', description: '한 발로 균형 잡기' },
-      { id: 'torso_rotation', name: '몸통 회전', sets: 2, reps: 10, description: '앉아서 상체 좌우 회전' },
-      { id: 'lateral_stretch', name: '옆구리 스트레칭', sets: 2, reps: '30초', description: '팔을 위로 뻗고 옆으로 기울이기' },
-    ],
-    benefits: ['좌우 균형 개선', '척추 정렬', '코어 강화'],
-    precautions: ['약한 쪽 더 집중', '거울 보며 자세 확인'],
-  },
-
-  // 무릎 관절염 관련
-  {
-    id: 'knee_strengthening',
-    name: '무릎 근력 강화',
-    targetDisease: '무릎 관절염',
-    duration: 20,
+    id: 'lower_body_strength',
+    name: '하체 강화 프로그램',
+    targetDisease: '하체 약화',
+    duration: 10,
     difficulty: 'easy',
     frequency: '주 3-4회',
     exercises: [
-      { id: 'quad_sets', name: '대퇴사두근 수축', sets: 3, reps: 10, description: '앉아서 무릎 뒤 바닥 누르기' },
-      { id: 'straight_leg_raise', name: '다리 들어올리기', sets: 3, reps: 12, description: '누워서 무릎 편 채로 다리 들기' },
-      { id: 'wall_sit', name: '벽 스쿼트', sets: 2, reps: '20초', description: '벽에 기대어 앉은 자세 유지' },
-      { id: 'calf_raise', name: '종아리 들기', sets: 2, reps: 15, description: '까치발 들었다 내리기' },
+      { id: 'squat', name: '스쿼트', sets: 3, reps: 10, description: '무릎을 굽혀 앉았다 일어나기 (실시간 분석)' },
     ],
-    benefits: ['무릎 안정성 향상', '관절 부담 감소', '보행 기능 개선'],
-    precautions: ['충격 운동 피하기', '통증 범위 내에서 실시'],
+    benefits: ['하체 근력 강화', '무릎 안정성 향상', '기초 대사량 증가'],
+    precautions: ['무릎이 발끝을 넘지 않게', '허리는 곧게 유지'],
   },
 
-  // 긴장성 두통 관련
-  {
-    id: 'tension_relief',
-    name: '긴장 완화 프로그램',
-    targetDisease: '긴장성 두통',
-    duration: 15,
-    difficulty: 'easy',
-    frequency: '필요시 수시로',
-    exercises: [
-      { id: 'scalp_massage', name: '두피 마사지', sets: 1, reps: '2분', description: '손가락으로 두피 원형 마사지' },
-      { id: 'temple_press', name: '관자놀이 지압', sets: 2, reps: '30초', description: '관자놀이를 천천히 누르기' },
-      { id: 'neck_release', name: '목 이완', sets: 2, reps: '30초', description: '목을 좌우로 기울여 이완' },
-      { id: 'shoulder_shrug', name: '어깨 으쓱', sets: 2, reps: 10, description: '어깨를 귀 쪽으로 올렸다 내리기' },
-    ],
-    benefits: ['두통 완화', '근육 이완', '스트레스 해소'],
-    precautions: ['조용한 환경에서 실시', '호흡에 집중'],
-  },
-
-  // 전신 예방 프로그램
+  // 전신 예방 프로그램 (일일 루틴용)
   {
     id: 'daily_posture',
     name: '일일 자세 교정',
     targetDisease: '전신 예방',
-    duration: 10,
+    duration: 15,
     difficulty: 'easy',
     frequency: '매일',
     exercises: [
-      { id: 'chin_tuck', name: '턱 당기기', sets: 2, reps: 10, description: '이중턱 만들기' },
-      { id: 'chest_opener', name: '가슴 열기', sets: 2, reps: '20초', description: '팔을 뒤로 깍지 끼고 가슴 펴기' },
-      { id: 'hip_flexor', name: '고관절 스트레칭', sets: 2, reps: '30초', description: '런지 자세로 고관절 늘리기' },
-      { id: 'full_body_stretch', name: '전신 스트레칭', sets: 1, reps: '1분', description: '팔을 위로 뻗고 온몸 늘이기' },
+      { id: 'chin-tuck', name: '턱 당기기', sets: 3, reps: '10초 유지', description: '이중턱 만들기 (타이머)' },
+      { id: 'shoulder-blade-squeeze', name: '견갑골 모으기', sets: 3, reps: '5초 유지', description: '견갑골 모으기 (타이머)' },
+      { id: 'neck-side-stretch', name: '목 옆 스트레칭', sets: 2, reps: 8, description: '목 스트레칭 (실시간 분석)' },
+      { id: 'shoulder-squeeze', name: '어깨 으쓱하기', sets: 3, reps: 12, description: '어깨 으쓱하기 (실시간 분석)' },
+      { id: 'arm-raise', name: '팔 들어올리기', sets: 2, reps: 10, description: '팔 들어올리기 (실시간 분석)' },
+      { id: 'squat', name: '스쿼트', sets: 3, reps: 10, description: '스쿼트 (실시간 분석)' },
     ],
-    benefits: ['자세 개선', '유연성 유지', '일상 피로 해소'],
+    benefits: ['자세 개선', '전신 근력 유지', '일상 피로 해소'],
     precautions: ['무리하지 않기', '호흡과 함께'],
   },
 ];
@@ -215,19 +132,25 @@ const EXERCISE_PROGRAMS: ExerciseProgram[] = [
 
 /**
  * 질환에 맞는 운동 프로그램 찾기
+ *
+ * 현재 분석 질환:
+ * - forward_head (거북목 증후군) → 거북목 개선 프로그램
+ * - round_shoulder (라운드숄더) → 라운드숄더 개선 프로그램
  */
 function findProgramsForDisease(diseaseId: string): ExerciseProgram[] {
   const diseaseMap: Record<string, string> = {
-    cervical_disc: '경추 디스크',
-    frozen_shoulder: '오십견',
-    lumbar_disc: '요추 디스크',
-    scoliosis: '척추측만증',
-    knee_arthritis: '무릎 관절염',
-    tension_headache: '긴장성 두통',
+    // 거북목
+    forward_head: '거북목',
+
+    // 라운드숄더
+    round_shoulder: '라운드숄더',
   };
 
   const targetDisease = diseaseMap[diseaseId];
-  if (!targetDisease) return [];
+  if (!targetDisease) {
+    // 매핑되지 않은 질환은 일일 자세 교정 프로그램 반환
+    return EXERCISE_PROGRAMS.filter((p) => p.id === 'daily_posture');
+  }
 
   return EXERCISE_PROGRAMS.filter((p) => p.targetDisease === targetDisease);
 }

@@ -1,5 +1,5 @@
 /**
- * 기록 페이지 - shadcn/ui 스타일
+ * 기록 페이지 - Calm 스타일
  *
  * Supabase 기록과 localStorage 기록을 함께 표시합니다.
  * 각 기록 카드에 촬영 이미지 썸네일을 표시합니다.
@@ -188,17 +188,17 @@ export default function HistoryPage() {
     <>
       <AppHeader />
 
-      <div className="min-h-screen bg-background pb-24 pt-14">
+      <div className="min-h-screen bg-slate-50 pb-24 pt-14">
         {/* 페이지 헤더 */}
         <motion.div
-          className="bg-card px-5 py-6 border-b"
+          className="bg-white px-5 py-6 border-b border-gray-100"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">기록</h1>
-              <p className="text-sm text-muted-foreground mt-1">
+              <h1 className="text-xl font-semibold text-gray-800">기록</h1>
+              <p className="text-sm text-gray-500 mt-1">
                 자세 분석 기록을 확인하세요
               </p>
             </div>

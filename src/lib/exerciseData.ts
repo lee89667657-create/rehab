@@ -108,6 +108,51 @@ export interface CountableExercise {
    * 기본값: false
    */
   mirrorMode?: boolean;
+
+  /**
+   * 캘리브레이션 기반 동작 감지용 변화량 임계값
+   * baseline 대비 이 값 이상 변화해야 동작으로 인식
+   * 기본값: 0.05 (5%)
+   */
+  deltaThreshold?: number;
+
+  /**
+   * 디바운싱 프레임 수
+   * 연속으로 조건 만족해야 상태 전환 (노이즈 방지)
+   * 기본값: 3
+   */
+  debounceFrames?: number;
+}
+
+/**
+ * 타이머 기반 운동 타입 (유지 시간 방식)
+ * - 동작이 미세하여 카메라 인식이 어려운 운동에 적합
+ * - "N초 유지 x M세트" 방식
+ */
+export interface TimerExercise {
+  /** 운동 고유 ID */
+  id: string;
+
+  /** 운동 이름 */
+  name: string;
+
+  /** 운동 설명 */
+  description: string;
+
+  /** 대상 질환/조건 */
+  targetDisease: string;
+
+  /** 세트 수 */
+  sets: number;
+
+  /** 1회 유지 시간 (초) */
+  holdTime: number;
+
+  /** 세트 간 휴식 시간 (초) */
+  restTime: number;
+
+  /** 자세 포인트 (사용자에게 표시할 주의사항) */
+  keyPoints: string[];
 }
 
 /**
@@ -160,31 +205,46 @@ export const JOINT_INDEX_MAP: Record<CountableExercise['countingJoint'], number 
 // 운동 데이터 정의
 // ============================================================
 
+// ============================================================
+// 타이머 기반 운동 데이터 (유지 시간 방식)
+// ============================================================
+
 /**
- * 실시간 카운팅 가능한 운동 목록
+ * 타이머 기반 운동 목록
+ * - 동작이 미세하여 카메라 인식이 어려운 운동
+ * - "N초 유지 x M세트" 방식
  */
+export const TIMER_EXERCISES: TimerExercise[] = [
+  {
+    id: 'chin-tuck',
+    name: '턱 당기기',
+    description: '턱을 뒤로 당겨 이중턱을 만들고 10초간 유지하세요',
+    targetDisease: '거북목',
+    sets: 3,
+    holdTime: 10,  // 10초 유지
+    restTime: 5,   // 세트 간 5초 휴식
+    keyPoints: ['시선은 정면 유지', '어깨는 고정', '턱만 뒤로 당기기', '10초간 유지'],
+  },
+  {
+    id: 'shoulder-blade-squeeze',
+    name: '견갑골 모으기',
+    description: '양쪽 견갑골을 서로 가깝게 모으고 5초간 유지하세요',
+    targetDisease: '라운드숄더',
+    sets: 3,
+    holdTime: 5,   // 5초 유지
+    restTime: 5,   // 세트 간 5초 휴식
+    keyPoints: ['등 중앙에 연필을 끼운다는 느낌', '어깨는 내리고', '5초간 유지', '천천히 이완'],
+  },
+];
+
+// ============================================================
+// 실시간 카운팅 운동 데이터
+// ============================================================
+
 export const COUNTABLE_EXERCISES: CountableExercise[] = [
   // ========================================
   // 거북목 개선 운동
   // ========================================
-  {
-    id: 'chin-tuck',
-    name: '턱 당기기',
-    description: '턱을 뒤로 당겨 이중턱을 만드세요',
-    targetDisease: '거북목',
-    duration: 60,
-    sets: 3,
-    reps: 10,
-    restTime: 15,
-    countingJoint: 'nose',
-    countingAxis: 'y',
-    // y축 기준: 값이 작을수록 위쪽 (턱을 당기면 코가 약간 위로)
-    // 실제로는 턱을 당기면 코의 y 좌표가 약간 변화
-    thresholdUp: 0.28,    // 턱 당긴 상태 (코가 약간 위로)
-    thresholdDown: 0.32,  // 원래 상태 (코가 정상 위치)
-    keyPoints: ['시선은 정면 유지', '어깨는 고정', '턱만 뒤로 당기기'],
-    countingCooldown: 500,
-  },
   {
     id: 'neck-side-stretch',
     name: '목 옆 스트레칭',
@@ -197,11 +257,13 @@ export const COUNTABLE_EXERCISES: CountableExercise[] = [
     countingJoint: 'nose',
     countingAxis: 'x',
     // x축 기준: 머리를 옆으로 기울이면 코의 x 좌표 변화
-    thresholdUp: 0.45,    // 중앙에서 왼쪽으로 기울인 상태
-    thresholdDown: 0.55,  // 중앙에서 오른쪽으로 기울인 상태
+    thresholdUp: 0.45,
+    thresholdDown: 0.55,
     keyPoints: ['어깨는 고정', '귀가 어깨에 닿도록', '반대쪽도 동일하게'],
     countingCooldown: 800,
     mirrorMode: true,
+    deltaThreshold: 0.08,  // 8% 변화량 (목 기울이기는 큰 움직임)
+    debounceFrames: 3,
   },
 
   // ========================================
@@ -219,49 +281,34 @@ export const COUNTABLE_EXERCISES: CountableExercise[] = [
     countingJoint: 'shoulder',
     countingAxis: 'y',
     // y축 기준: 어깨를 올리면 y 좌표가 작아짐 (위로 이동)
-    thresholdUp: 0.32,    // 어깨 올린 상태
-    thresholdDown: 0.38,  // 어깨 내린 상태
+    thresholdUp: 0.73,
+    thresholdDown: 0.77,
     keyPoints: ['팔은 옆에 붙이고', '어깨만 올리기', '천천히 내리기'],
     countingCooldown: 400,
+    deltaThreshold: 0.05,  // 5% 변화량
+    debounceFrames: 3,
   },
-  {
-    id: 'shoulder-blade-squeeze',
-    name: '견갑골 모으기',
-    description: '양쪽 견갑골을 서로 가깝게 모으세요',
-    targetDisease: '라운드숄더',
-    duration: 60,
-    sets: 3,
-    reps: 10,
-    restTime: 15,
-    countingJoint: 'shoulder',
-    countingAxis: 'x',
-    // x축 기준: 견갑골을 모으면 어깨가 뒤로 -> 어깨 사이 거리 변화
-    // 여기서는 어깨의 x 좌표 변화를 감지
-    thresholdUp: 0.35,    // 어깨 모은 상태 (어깨가 뒤로)
-    thresholdDown: 0.42,  // 어깨 펴진 상태
-    keyPoints: ['등 중앙에 연필을 끼운다는 느낌', '5초간 유지', '천천히 이완'],
-    countingCooldown: 600,
-  },
-
   // ========================================
   // 하체 운동
   // ========================================
   {
     id: 'squat',
     name: '스쿼트',
-    description: '무릎을 굽혀 앉았다 일어나세요',
+    description: '무릎을 굽혀 앉았다 일어나세요. 전신이 보이도록 카메라에서 떨어져주세요.',
     targetDisease: '무릎/골반',
     duration: 90,
     sets: 3,
     reps: 10,
     restTime: 30,
-    countingJoint: 'hip',
+    countingJoint: 'knee',
     countingAxis: 'y',
-    // y축 기준: 앉으면 골반 y 좌표가 커짐 (아래로 이동)
-    thresholdUp: 0.50,    // 선 상태
-    thresholdDown: 0.65,  // 앉은 상태
-    keyPoints: ['무릎이 발끝을 넘지 않게', '허리는 곧게', '엉덩이를 뒤로'],
+    // y축 기준: 스쿼트하면 무릎 y 좌표가 작아짐 (무릎이 위로 올라감)
+    thresholdUp: 0.60,    // 선 상태 (무릎 아래쪽)
+    thresholdDown: 0.50,  // 앉은 상태 (무릎 위쪽)
+    keyPoints: ['카메라에 무릎이 보이도록', '무릎이 발끝을 넘지 않게', '허리는 곧게', '엉덩이를 뒤로'],
     countingCooldown: 500,
+    deltaThreshold: 0.08,  // 8% 변화량 (큰 움직임)
+    debounceFrames: 3,
   },
   {
     id: 'knee-lift',
@@ -279,6 +326,8 @@ export const COUNTABLE_EXERCISES: CountableExercise[] = [
     thresholdDown: 0.75,  // 무릎 내린 상태
     keyPoints: ['상체 곧게 유지', '천천히 올리고 내리기', '양쪽 번갈아 실시'],
     countingCooldown: 400,
+    deltaThreshold: 0.08,  // 8% 변화량
+    debounceFrames: 3,
   },
 
   // ========================================
@@ -300,6 +349,8 @@ export const COUNTABLE_EXERCISES: CountableExercise[] = [
     thresholdDown: 0.55,  // 팔 내린 상태
     keyPoints: ['팔을 곧게 펴고', '어깨 높이 이상으로', '천천히 올리고 내리기'],
     countingCooldown: 500,
+    deltaThreshold: 0.10,  // 10% 변화량 (팔 움직임 큼)
+    debounceFrames: 3,
   },
   {
     id: 'elbow-flex',
@@ -317,6 +368,8 @@ export const COUNTABLE_EXERCISES: CountableExercise[] = [
     thresholdDown: 0.50,  // 팔 펴진 상태
     keyPoints: ['팔꿈치는 몸에 붙이고', '손목만 올리기', '천천히 반복'],
     countingCooldown: 400,
+    deltaThreshold: 0.08,  // 8% 변화량
+    debounceFrames: 3,
   },
 ];
 
@@ -325,17 +378,40 @@ export const COUNTABLE_EXERCISES: CountableExercise[] = [
 // ============================================================
 
 /**
- * ID로 운동 찾기
+ * ID로 카운팅 운동 찾기
  */
 export function getCountableExerciseById(id: string): CountableExercise | undefined {
   return COUNTABLE_EXERCISES.find((ex) => ex.id === id);
 }
 
 /**
- * 대상 질환으로 운동 필터링
+ * ID로 타이머 운동 찾기
+ */
+export function getTimerExerciseById(id: string): TimerExercise | undefined {
+  return TIMER_EXERCISES.find((ex) => ex.id === id);
+}
+
+/**
+ * ID로 모든 운동에서 찾기 (카운팅 + 타이머)
+ */
+export function getExerciseById(id: string): CountableExercise | TimerExercise | undefined {
+  return getCountableExerciseById(id) || getTimerExerciseById(id);
+}
+
+/**
+ * 대상 질환으로 운동 필터링 (카운팅 운동만)
  */
 export function getExercisesByDisease(disease: string): CountableExercise[] {
   return COUNTABLE_EXERCISES.filter((ex) =>
+    ex.targetDisease.toLowerCase().includes(disease.toLowerCase())
+  );
+}
+
+/**
+ * 대상 질환으로 타이머 운동 필터링
+ */
+export function getTimerExercisesByDisease(disease: string): TimerExercise[] {
+  return TIMER_EXERCISES.filter((ex) =>
     ex.targetDisease.toLowerCase().includes(disease.toLowerCase())
   );
 }

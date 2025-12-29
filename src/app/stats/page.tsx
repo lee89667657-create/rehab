@@ -46,6 +46,7 @@ import {
   type AnalysisResultRow,
   type DailyRecordRow,
 } from '@/lib/supabase';
+import { LOWER_BODY_ANALYSIS_ENABLED } from '@/constants/features';
 
 // shadcn/ui 컴포넌트
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -207,12 +208,22 @@ export default function StatsPage() {
     if (analysisRecords.length === 0) return [];
 
     const latest = analysisRecords[0];
-    return [
-      { subject: '머리 정렬', value: latest.head_forward, fullMark: 100 },
-      { subject: '어깨 균형', value: latest.shoulder_balance, fullMark: 100 },
-      { subject: '골반 균형', value: latest.pelvic_tilt, fullMark: 100 },
-      { subject: '무릎 정렬', value: latest.knee_alignment, fullMark: 100 },
+
+    // 기본 상체 분석 항목
+    const upperBodyData: RadarDataPoint[] = [
+      { subject: '거북목', value: latest.head_forward, fullMark: 100 },
+      { subject: '라운드숄더', value: latest.shoulder_balance, fullMark: 100 },
     ];
+
+    // [하체 분석 - 추후 활성화 예정] features.ts의 LOWER_BODY_ANALYSIS_ENABLED로 제어
+    const lowerBodyData: RadarDataPoint[] = LOWER_BODY_ANALYSIS_ENABLED
+      ? [
+          { subject: '골반 균형', value: latest.pelvic_tilt, fullMark: 100 },
+          { subject: '무릎 정렬', value: latest.knee_alignment, fullMark: 100 },
+        ]
+      : [];
+
+    return [...upperBodyData, ...lowerBodyData];
   }, [analysisRecords]);
 
   // 주간 활동 데이터
@@ -276,7 +287,7 @@ export default function StatsPage() {
     return (
       <>
         <AppHeader />
-        <div className="min-h-screen bg-background pb-24 pt-14">
+        <div className="min-h-screen bg-slate-50 pb-24 pt-14">
           <div className="px-5 pt-5 space-y-4">
             {[1, 2, 3, 4].map((i) => (
               <Card key={i}>
@@ -298,7 +309,7 @@ export default function StatsPage() {
     return (
       <>
         <AppHeader />
-        <div className="min-h-screen bg-background pb-24 pt-14">
+        <div className="min-h-screen bg-slate-50 pb-24 pt-14">
           <motion.div
             className="px-5 pt-5"
             variants={containerVariants}
@@ -344,10 +355,10 @@ export default function StatsPage() {
     <>
       <AppHeader />
 
-      <div className="min-h-screen bg-background pb-24 pt-14">
+      <div className="min-h-screen bg-slate-50 pb-24 pt-14">
         {/* 페이지 헤더 */}
         <motion.div
-          className="bg-card px-5 py-6 border-b"
+          className="bg-white px-5 py-6 border-b border-gray-100"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -360,9 +371,9 @@ export default function StatsPage() {
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <h1 className="text-2xl font-bold text-foreground">통계</h1>
+            <h1 className="text-xl font-semibold text-gray-800">통계</h1>
           </div>
-          <p className="text-sm text-muted-foreground ml-11">
+          <p className="text-sm text-gray-500 ml-11">
             자세 분석 데이터를 한눈에 확인하세요
           </p>
         </motion.div>
