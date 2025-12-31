@@ -252,10 +252,10 @@ function generateRecommendations(diseases: DiseaseRisk[], overallRisk: number): 
   highRiskDiseases.forEach((disease) => {
     switch (disease.id) {
       case 'forward_head':
-        recommendations.push('턱 당기기와 목 스트레칭을 매일 실시하세요.');
+        recommendations.push('턱 당기기와 거북목 교정 운동을 매일 실시하세요.');
         break;
       case 'round_shoulder':
-        recommendations.push('견갑골 모으기와 어깨 스트레칭을 권장합니다.');
+        recommendations.push('견갑골 모으기와 라운드숄더 교정 운동을 권장합니다.');
         break;
     }
   });

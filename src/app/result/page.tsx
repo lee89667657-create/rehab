@@ -26,11 +26,9 @@ import {
   LucideIcon,
   AlertTriangle,
   HeartPulse,
-  ShieldAlert,
   Clock,
   Lightbulb,
   Camera,
-  Bone,
   Box,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -72,7 +70,7 @@ import {
 } from '@/lib/advancedAnalysis';
 
 // 고급 분석 리포트 컴포넌트
-import AdvancedReport from '@/components/analysis/AdvancedReport';
+import AdvancedReport, { BalanceCard } from '@/components/analysis/AdvancedReport';
 
 // 3D 스켈레톤 시각화 컴포넌트 (OpenCap Kinematic 스타일)
 import Skeleton3D from '@/components/analysis/Skeleton3D';
@@ -80,7 +78,7 @@ import Skeleton3D from '@/components/analysis/Skeleton3D';
 import Skeleton3DModel from '@/components/analysis/Skeleton3DModel';
 
 // shadcn/ui 컴포넌트
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -110,13 +108,13 @@ import { filterEnabledItems, LOWER_BODY_ANALYSIS_ENABLED } from '@/constants/fea
 const itemDetails: Record<string, { detail: string; recommendation: string; bodyPart: string; normalRange: string }> = {
   forward_head: {
     detail: '귀와 어깨 사이의 거리를 측정했습니다.',
-    recommendation: '목 스트레칭',
+    recommendation: '거북목 운동',
     bodyPart: 'head',
     normalRange: '0 ~ 2.5cm',
   },
   shoulder_tilt: {
-    detail: '좌우 어깨 높이 차이를 측정했습니다.',
-    recommendation: '어깨 스트레칭',
+    detail: '어깨가 앞으로 말린 정도를 측정했습니다.',
+    recommendation: '라운드숄더 운동',
     bodyPart: 'shoulder',
     normalRange: '0 ~ 1cm',
   },
@@ -288,10 +286,11 @@ const itemVariants = {
 };
 
 // ============================================================
-// 컴포넌트: 질환 위험도 카드
+// 컴포넌트: 질환 위험도 카드 (추후 사용 예정)
 // ============================================================
 
-function DiseaseRiskCard({
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _DiseaseRiskCard({
   disease,
   isExpanded,
   onToggle,
@@ -413,10 +412,11 @@ function DiseaseRiskCard({
 }
 
 // ============================================================
-// 컴포넌트: 운동 프로그램 카드
+// 컴포넌트: 운동 프로그램 카드 (추후 사용 예정)
 // ============================================================
 
-function ExerciseProgramCard({
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _ExerciseProgramCard({
   program,
   isPrimary = false,
 }: {
@@ -475,10 +475,11 @@ function ExerciseProgramCard({
 }
 
 // ============================================================
-// 컴포넌트: 자세 유형 카드
+// 컴포넌트: 자세 유형 카드 (추후 사용 예정)
 // ============================================================
 
-function PostureTypeCard({ postureType }: { postureType: PostureType }) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _PostureTypeCard({ postureType }: { postureType: PostureType }) {
   // 아이콘 컴포넌트
   const PostureIcon = postureType.icon;
 
@@ -517,10 +518,11 @@ function PostureTypeCard({ postureType }: { postureType: PostureType }) {
 }
 
 // ============================================================
-// 컴포넌트: 인체도
+// 컴포넌트: 인체도 (추후 사용 예정)
 // ============================================================
 
-function BodyDiagram({ items }: { items: AnalysisItem[] }) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _BodyDiagram({ items }: { items: AnalysisItem[] }) {
   const getPartColor = (partId: string) => {
     const item = items.find((i) => itemDetails[i.id]?.bodyPart === partId || i.id.includes(partId));
     if (!item) return 'hsl(var(--muted))';
@@ -581,10 +583,12 @@ function AnalysisItemCard({
   item,
   isOpen,
   onToggle,
+  index = 0,
 }: {
   item: AnalysisItem | ExtendedAnalysisItem;
   isOpen: boolean;
   onToggle: () => void;
+  index?: number;
 }) {
   const detail = (item as ExtendedAnalysisItem).detail || itemDetails[item.id]?.detail || item.description;
   const recommendation = (item as ExtendedAnalysisItem).recommendation || itemDetails[item.id]?.recommendation || '맞춤 운동';
@@ -594,7 +598,11 @@ function AnalysisItemCard({
   const badgeLabel = item.grade === 'good' ? '정상' : item.grade === 'warning' ? '주의' : '위험';
 
   return (
-    <motion.div variants={itemVariants}>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: 'easeOut', delay: index * 0.08 }}
+    >
       <Card className="overflow-hidden">
         <button
           onClick={onToggle}
@@ -681,13 +689,18 @@ export default function ResultPage() {
   const storedLandmarks = useLandmarks();
 
   const [openItemId, setOpenItemId] = useState<string | null>(null);
-  const [expandedDiseaseId, setExpandedDiseaseId] = useState<string | null>(null);
   // 3D 스켈레톤 뷰 전환 상태 ('front' | 'side')
   const [skeleton3DView, setSkeleton3DView] = useState<'front' | 'side'>('front');
   // 3D 모델 모드 토글 (true: GLTF 모델, false: 스틱 피겨)
   const [use3DModel, setUse3DModel] = useState<boolean>(true);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // 아코디언 상태 (기본 접힘)
+  const [isSkeletonOpen, setIsSkeletonOpen] = useState(false);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [isBalanceOpen, setIsBalanceOpen] = useState(false);
+  const [isDetailedOpen, setIsDetailedOpen] = useState(false);
   const hasSavedRef = useRef(false);
 
   const [isFromHistory, setIsFromHistory] = useState(false);
@@ -972,8 +985,9 @@ export default function ResultPage() {
     saveResult();
   }, [user, analysisResult, isFromHistory]);
 
-  // 자세 유형 분류
-  const postureType = useMemo((): PostureType => {
+  // 자세 유형 분류 (추후 사용 예정)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _postureType = useMemo((): PostureType => {
     const headItem = results.find(i => i.id === 'forward_head');
     const shoulderItem = results.find(i => i.id === 'shoulder_tilt');
     const kneeItem = results.find(i => i.id === 'knee_angle');
@@ -1041,6 +1055,33 @@ export default function ResultPage() {
   const warningCount = results.filter((item) => item.grade !== 'good').length;
   const scoreMessage = getScoreMessage(overallScore);
 
+  // ============================================================
+  // 전체 자세 점수 계산 (요약 카드용)
+  // ============================================================
+  const summaryScore = useMemo(() => {
+    // 거북목, 라운드숄더 위험도 기반 계산
+    const forwardHeadRisk = diseaseRiskAnalysis.diseases.find(d => d.id === 'forward_head')?.risk ?? 50;
+    const roundShoulderRisk = diseaseRiskAnalysis.diseases.find(d => d.id === 'round_shoulder')?.risk ?? 50;
+
+    // (100 - 거북목위험도 + 100 - 라운드숄더위험도) / 2
+    const score = Math.round((100 - forwardHeadRisk + 100 - roundShoulderRisk) / 2);
+    return Math.max(0, Math.min(100, score));
+  }, [diseaseRiskAnalysis]);
+
+  const getSummaryMessage = (score: number): string => {
+    if (score >= 90) return '아주 좋은 자세예요!';
+    if (score >= 70) return '전반적으로 양호해요';
+    if (score >= 50) return '조금 신경 쓰면 좋겠어요';
+    return '교정이 필요해요';
+  };
+
+  const getSummaryScoreColor = (score: number): string => {
+    if (score >= 90) return 'text-green-500';
+    if (score >= 70) return 'text-blue-500';
+    if (score >= 50) return 'text-yellow-500';
+    return 'text-red-500';
+  };
+
   return (
     <>
       <AppHeader />
@@ -1077,605 +1118,311 @@ export default function ResultPage() {
         </motion.header>
 
         <motion.div
-          className="px-5 pt-5"
+          className="px-4 sm:px-6 py-6 space-y-6"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
         >
           {/* ============================================================ */}
-          {/* 촬영 이미지 섹션 - 항상 표시 */}
+          {/* 전체 자세 점수 요약 카드 */}
           {/* ============================================================ */}
           <motion.section variants={itemVariants}>
-            <Card className="mb-4">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Camera className="w-4 h-4" />
-                  촬영 이미지
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-3 overflow-x-auto pb-2">
-                  {/* 정면 이미지 */}
-                  <div className="flex-shrink-0 text-center">
-                    <div className="w-28 h-36 bg-gray-200 rounded-lg overflow-hidden">
-                      {displayImages.front ? (
-                        <img
-                          src={displayImages.front}
-                          alt="정면"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
-                          이미지 없음
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">정면</p>
-                  </div>
-                  {/* 측면 이미지 */}
-                  <div className="flex-shrink-0 text-center">
-                    <div className="w-28 h-36 bg-gray-200 rounded-lg overflow-hidden">
-                      {displayImages.side ? (
-                        <img
-                          src={displayImages.side}
-                          alt="측면"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
-                          이미지 없음
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">측면</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm text-center">
+              <p className="text-sm text-gray-500 mb-2">전체 자세 점수</p>
+              <p className={`text-4xl font-bold ${getSummaryScoreColor(summaryScore)}`}>
+                {summaryScore}점 <span className="text-lg font-normal text-gray-400">/ 100점</span>
+              </p>
+              <p className="text-gray-600 mt-3">{getSummaryMessage(summaryScore)}</p>
+            </div>
           </motion.section>
 
           {/* ============================================================ */}
-          {/* 스켈레톤 정렬 분석 섹션 - 임시 비활성화 (나중에 다시 추가 예정) */}
+          {/* 거북목 위험도 카드 - 항상 표시 (간소화) */}
           {/* ============================================================ */}
-          {/*
-          <motion.section variants={itemVariants}>
-            <Card className="mb-4">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Bone className="w-4 h-4 text-blue-500" />
-                  정렬 분석
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="relative bg-slate-50 border border-gray-200 rounded-xl p-4 aspect-[3/4] flex items-center justify-center overflow-hidden">
-                    {displayImages.front && (
-                      <img
-                        src={displayImages.front}
-                        alt="정면"
-                        className="absolute inset-0 w-full h-full object-cover opacity-20"
-                      />
-                    )}
-                    <div className="absolute left-1/2 top-4 bottom-4 w-px border-l-2 border-dashed border-rose-300" />
-                    <div className="absolute left-4 right-4 top-[22%] border-t border-dashed border-amber-300" />
-                    <div className="absolute left-4 right-4 top-[48%] border-t border-dashed border-amber-300" />
-                    <svg className="absolute inset-0 w-full h-full" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}>
-                      <circle cx="50%" cy="14%" r="8" fill="#3B82F6" />
-                      <line x1="50%" y1="14%" x2="50%" y2="22%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      <line x1="30%" y1="22%" x2="70%" y2="22%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      <circle cx="30%" cy="22%" r="6" fill="#3B82F6" />
-                      <circle cx="70%" cy="22%" r="6" fill="#3B82F6" />
-                      <line x1="50%" y1="22%" x2="50%" y2="48%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      <line x1="36%" y1="48%" x2="64%" y2="48%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      <circle cx="36%" cy="48%" r="6" fill="#3B82F6" />
-                      <circle cx="64%" cy="48%" r="6" fill="#3B82F6" />
-                      <line x1="36%" y1="48%" x2="36%" y2="72%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      <line x1="64%" y1="48%" x2="64%" y2="72%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      <circle cx="36%" cy="72%" r="5" fill="#3B82F6" />
-                      <circle cx="64%" cy="72%" r="5" fill="#3B82F6" />
-                      <line x1="36%" y1="72%" x2="36%" y2="88%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      <line x1="64%" y1="72%" x2="64%" y2="88%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      <circle cx="36%" cy="88%" r="4" fill="#3B82F6" />
-                      <circle cx="64%" cy="88%" r="4" fill="#3B82F6" />
-                    </svg>
-                    <span className="absolute bottom-2 left-2 text-xs font-medium text-gray-500 bg-white/80 px-2 py-1 rounded-md">
-                      정면
+          <motion.section variants={itemVariants} className="space-y-3">
+            {diseaseRiskAnalysis.diseases.map((disease) => (
+              <div key={disease.id} className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      disease.level === 'low' ? 'bg-emerald-100' :
+                      disease.level === 'medium' ? 'bg-yellow-100' :
+                      disease.level === 'high' ? 'bg-orange-100' : 'bg-red-100'
+                    }`}>
+                      <HeartPulse className={`w-5 h-5 ${getRiskColorClass(disease.level)}`} />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-800">{disease.name}</p>
+                      <p className="text-xs text-gray-500">{disease.description}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-2xl font-bold ${getRiskColorClass(disease.level)}`}>
+                      {disease.risk}%
                     </span>
+                    <Badge variant={
+                      disease.level === 'low' ? 'default' :
+                      disease.level === 'medium' ? 'secondary' : 'destructive'
+                    } className="ml-2 text-[10px]">
+                      {getRiskLevelLabel(disease.level)}
+                    </Badge>
                   </div>
-                  <div className="relative bg-slate-50 border border-gray-200 rounded-xl p-4 aspect-[3/4] flex items-center justify-center overflow-hidden">
-                    {displayImages.side && (
-                      <img
-                        src={displayImages.side}
-                        alt="측면"
-                        className="absolute inset-0 w-full h-full object-cover opacity-20"
-                      />
-                    )}
-                    <div className="absolute left-1/2 top-4 bottom-4 w-px border-l-2 border-emerald-400" />
-                    <svg className="absolute inset-0 w-full h-full" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}>
-                      <circle cx="54%" cy="14%" r="8" fill="#3B82F6" />
-                      <line x1="54%" y1="14%" x2="52%" y2="22%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      <circle cx="52%" cy="22%" r="6" fill="#3B82F6" />
-                      <line x1="52%" y1="22%" x2="48%" y2="48%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      <circle cx="48%" cy="48%" r="6" fill="#3B82F6" />
-                      <line x1="48%" y1="48%" x2="50%" y2="72%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      <circle cx="50%" cy="72%" r="5" fill="#3B82F6" />
-                      <line x1="50%" y1="72%" x2="50%" y2="88%" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" />
-                      <circle cx="50%" cy="88%" r="4" fill="#3B82F6" />
-                    </svg>
-                    <span className="absolute bottom-2 left-2 text-xs font-medium text-gray-500 bg-white/80 px-2 py-1 rounded-md">
-                      측면
-                    </span>
-                  </div>
-                </div>
-                <div className="flex justify-center gap-6 mt-4 text-xs text-gray-500">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full" />
-                    <span>관절</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-0.5 bg-rose-300 rounded" />
-                    <span>중앙선</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-0.5 bg-emerald-400 rounded" />
-                    <span>이상 정렬</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.section>
-          */}
-
-          {/* ============================================================ */}
-          {/* 3D Postural Analysis (깔끔한 단일 UI) */}
-          {/* ============================================================ */}
-          <motion.section variants={itemVariants}>
-            <Card className="mb-4">
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Box className="w-4 h-4" />
-                      Postural Analysis
-                    </CardTitle>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Postural alignment relative to global reference frame
-                    </p>
-                  </div>
-                  {/* 모델 타입 토글 */}
-                  <button
-                    onClick={() => setUse3DModel(!use3DModel)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                      use3DModel
-                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    }`}
-                  >
-                    {use3DModel ? '3D Model' : 'Skeleton'}
-                  </button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {/* 뷰 버튼 - 정면/측면만 */}
-                <div className="flex justify-center mb-4">
-                  <div className="flex gap-1 bg-muted p-1 rounded-lg">
-                    {(['front', 'side'] as const).map((view) => (
-                      <button
-                        key={view}
-                        onClick={() => setSkeleton3DView(view)}
-                        disabled={!displayLandmarks[view]}
-                        className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                          skeleton3DView === view
-                            ? 'bg-primary text-primary-foreground'
-                            : displayLandmarks[view]
-                              ? 'text-muted-foreground hover:text-foreground hover:bg-muted/80'
-                              : 'text-muted-foreground/40 cursor-not-allowed'
-                        }`}
-                      >
-                        {view === 'front' ? '정면' : '측면'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 3D 스켈레톤 / 모델 */}
-                <div className="flex justify-center">
-                  {displayLandmarks[skeleton3DView] ? (
-                    use3DModel ? (
-                      <Skeleton3DModel
-                        landmarks={displayLandmarks[skeleton3DView]}
-                        viewMode={skeleton3DView}
-                        width={400}
-                        height={480}
-                      />
-                    ) : (
-                      <Skeleton3D
-                        landmarks={displayLandmarks[skeleton3DView]}
-                        viewMode={skeleton3DView}
-                        width={400}
-                        height={480}
-                      />
-                    )
-                  ) : (
-                    <div className="w-[400px] h-[480px] bg-[#0d1117] rounded-lg flex items-center justify-center">
-                      <div className="text-center text-[#8b949e]">
-                        <p className="text-sm font-medium">No data for {skeleton3DView} view</p>
-                        <p className="text-xs mt-1">Capture this angle first</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* 범례 */}
-                <div className="flex justify-center gap-6 mt-4 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-0.5 bg-[#60a5fa]"></div>
-                    <span>Vertical ref</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-0.5 bg-[#4ade80]"></div>
-                    <span>Shoulder line</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-0.5 bg-[#fbbf24]"></div>
-                    <span>Pelvis line</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.section>
-
-          {/* ============================================================ */}
-          {/* 고급 분석 리포트 (ROM, 비대칭) */}
-          {/* ============================================================ */}
-          {jointAngles && (
-            <motion.section variants={itemVariants} className="mb-5">
-              <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-primary" />
-                고급 분석
-              </h2>
-              <AdvancedReport
-                jointAngles={jointAngles}
-                romResults={romResults}
-                asymmetryResults={asymmetryResults}
-              />
-              {/* ROM/비대칭 점수 요약 */}
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                <Card>
-                  <CardContent className="p-3">
-                    <p className="text-xs text-muted-foreground mb-1">ROM 정상 비율</p>
-                    <p className="text-2xl font-bold text-primary">{romScore}%</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-3">
-                    <p className="text-xs text-muted-foreground mb-1">좌우 균형 점수</p>
-                    <p className="text-2xl font-bold text-primary">{asymmetryScore}점</p>
-                  </CardContent>
-                </Card>
-              </div>
-              {/* 비대칭 요약 메시지 */}
-              <Card className="mt-3 bg-muted/50">
-                <CardContent className="p-3">
-                  <p className="text-sm text-foreground">{asymmetrySummary}</p>
-                </CardContent>
-              </Card>
-            </motion.section>
-          )}
-
-          {/* ============================================================ */}
-          {/* 자세 유형 분류 */}
-          {/* ============================================================ */}
-          <PostureTypeCard postureType={postureType} />
-
-          {/* ============================================================ */}
-          {/* 종합 점수 + 인체도 */}
-          {/* ============================================================ */}
-          <motion.section variants={itemVariants} className="mb-5">
-            <Card>
-              <CardContent className="p-5">
-                <div className="flex items-center gap-5">
-                  <div className="w-24 h-40 flex-shrink-0">
-                    <BodyDiagram items={results} />
-                  </div>
-
-                  <div className="flex-1">
-                    <div className="flex items-baseline gap-1 mb-2">
-                      <motion.span
-                        className="text-5xl font-bold text-foreground"
-                        initial={{ opacity: 0, scale: 0.5 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.3, duration: 0.5 }}
-                      >
-                        {overallScore}
-                      </motion.span>
-                      <span className="text-lg text-muted-foreground font-medium">점</span>
-                    </div>
-
-                    <div className="mb-3">
-                      <Progress value={overallScore} className="h-2" />
-                    </div>
-
-                    <p className="text-base font-bold text-foreground">
-                      {scoreMessage.text}
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      {scoreMessage.sub}
-                    </p>
-
-                    <div className="mt-3 flex items-center gap-1.5">
-                      {isSaving ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                          <span className="text-xs text-primary font-medium">저장 중...</span>
-                        </>
-                      ) : isSaved ? (
-                        <>
-                          <Check className="w-4 h-4 text-green-500" />
-                          <span className="text-xs text-green-500 font-medium">클라우드에 저장됨</span>
-                        </>
-                      ) : (
-                        <>
-                          <TrendingUp className="w-4 h-4 text-primary" />
-                          <span className="text-xs text-primary font-medium">분석 완료</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.section>
-
-          {/* 요약 카드 */}
-          <motion.section className="grid grid-cols-2 gap-3 mb-5" variants={itemVariants}>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-xl bg-green-500 flex items-center justify-center">
-                    <Check className="w-4 h-4 text-white" />
-                  </div>
-                  <span className="text-sm font-semibold text-foreground">정상</span>
-                </div>
-                <p className="text-2xl font-bold text-green-500">{normalCount}개</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-xl bg-amber-500 flex items-center justify-center">
-                    <AlertCircle className="w-4 h-4 text-white" />
-                  </div>
-                  <span className="text-sm font-semibold text-foreground">주의/위험</span>
-                </div>
-                <p className="text-2xl font-bold text-amber-500">{warningCount}개</p>
-              </CardContent>
-            </Card>
-          </motion.section>
-
-          {/* ============================================================ */}
-          {/* 거북목 / 라운드숄더 분석 섹션 */}
-          {/* ============================================================ */}
-          <motion.section variants={itemVariants} className="mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                <ShieldAlert className="w-5 h-5 text-primary" />
-                거북목 / 라운드숄더 분석
-              </h2>
-              <Badge variant={
-                diseaseRiskAnalysis.overallLevel === 'low' ? 'default' :
-                diseaseRiskAnalysis.overallLevel === 'medium' ? 'secondary' :
-                'destructive'
-              }>
-                전체 {diseaseRiskAnalysis.overallRisk}%
-              </Badge>
-            </div>
-
-            {/* 가장 우려되는 질환 */}
-            {diseaseRiskAnalysis.primaryConcern && (
-              <Card className="mb-3 border-orange-200 bg-orange-50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="w-4 h-4 text-orange-500" />
-                    <span className="text-sm font-semibold text-orange-700">주요 우려</span>
-                  </div>
-                  <p className="text-base font-bold text-foreground">
-                    {diseaseRiskAnalysis.primaryConcern.name}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    위험도 {diseaseRiskAnalysis.primaryConcern.risk}% - {diseaseRiskAnalysis.primaryConcern.description}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* 거북목 / 라운드숄더 위험도 카드 */}
-            <div className="space-y-3">
-              {diseaseRiskAnalysis.diseases.map((disease) => (
-                <DiseaseRiskCard
-                  key={disease.id}
-                  disease={disease}
-                  isExpanded={expandedDiseaseId === disease.id}
-                  onToggle={() => setExpandedDiseaseId(
-                    expandedDiseaseId === disease.id ? null : disease.id
-                  )}
-                />
-              ))}
-            </div>
-
-            {/* 권장 사항 */}
-            {diseaseRiskAnalysis.recommendations.length > 0 && (
-              <Card className="mt-4 bg-primary/5 border-primary/20">
-                <CardContent className="p-4">
-                  <p className="text-sm font-semibold text-primary mb-2 flex items-center gap-1">
-                    <Lightbulb className="w-4 h-4" />
-                    권장 사항
-                  </p>
-                  <ul className="space-y-1.5">
-                    {diseaseRiskAnalysis.recommendations.map((rec, idx) => (
-                      <li key={idx} className="text-sm text-foreground flex items-start gap-2">
-                        <Check className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                        {rec}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            )}
-          </motion.section>
-
-          {/* 맞춤 운동 프로그램 추천 섹션 */}
-          <motion.section variants={itemVariants} className="mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                <Dumbbell className="w-5 h-5 text-primary" />
-                맞춤 운동 프로그램
-              </h2>
-            </div>
-
-            {/* 주간 목표 */}
-            <Card className="mb-3 bg-muted/50">
-              <CardContent className="p-3">
-                <p className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Target className="w-4 h-4 text-primary" />
-                  {exerciseRecommendation.weeklyGoal}
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* 긴급 추천 프로그램 */}
-            {exerciseRecommendation.urgentPrograms.length > 0 && (
-              <div className="mb-4">
-                <p className="text-sm font-semibold text-red-600 mb-2 flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4" />
-                  긴급 추천
-                </p>
-                <div className="space-y-3">
-                  {exerciseRecommendation.urgentPrograms.map((program, idx) => (
-                    <ExerciseProgramCard
-                      key={program.id}
-                      program={program}
-                      isPrimary={idx === 0}
-                    />
-                  ))}
                 </div>
               </div>
-            )}
+            ))}
+          </motion.section>
 
-            {/* 일반 추천 프로그램 */}
+          {/* ============================================================ */}
+          {/* 맞춤 운동 버튼 - 항상 표시 */}
+          {/* ============================================================ */}
+          <motion.section variants={itemVariants}>
             {exerciseRecommendation.recommendedPrograms.length > 0 && (
-              <div className="mb-4">
-                <p className="text-sm font-semibold text-primary mb-2 flex items-center gap-1">
-                  <Check className="w-4 h-4" />
-                  추천 프로그램
-                </p>
-                <div className="space-y-3">
-                  {exerciseRecommendation.recommendedPrograms.map((program) => (
-                    <ExerciseProgramCard
-                      key={program.id}
-                      program={program}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 예방 프로그램 */}
-            {exerciseRecommendation.preventivePrograms.length > 0 && (
-              <div className="mb-4">
-                <p className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-1">
-                  <ShieldAlert className="w-4 h-4" />
-                  예방 프로그램
-                </p>
-                <div className="space-y-3">
-                  {exerciseRecommendation.preventivePrograms.map((program) => (
-                    <ExerciseProgramCard
-                      key={program.id}
-                      program={program}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 일일 루틴 */}
-            {exerciseRecommendation.dailyRoutine.length > 0 && (
-              <Card className="mt-4 bg-primary/5 border-primary/20">
-                <CardContent className="p-4">
-                  <p className="text-sm font-semibold text-primary mb-3 flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    오늘의 루틴
-                  </p>
-                  <div className="space-y-2">
-                    {exerciseRecommendation.dailyRoutine.map((exercise, idx) => (
-                      <div key={exercise.id} className="flex items-center gap-3 text-sm">
-                        <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
-                          {idx + 1}
-                        </span>
-                        <span className="flex-1 font-medium text-foreground">{exercise.name}</span>
-                        <span className="text-muted-foreground">{exercise.sets}세트 x {exercise.reps}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              <button
+                className="w-full py-4 flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium rounded-2xl border border-blue-100 shadow-sm transition-all"
+                onClick={() => router.push(`/exercise?program=${exerciseRecommendation.recommendedPrograms[0].id}`)}
+              >
+                <Dumbbell className="w-5 h-5" />
+                {exerciseRecommendation.recommendedPrograms[0].name} 시작하기
+                <ChevronRight className="w-5 h-5" />
+              </button>
             )}
           </motion.section>
 
           {/* ============================================================ */}
-          {/* 항목별 상세 분석 섹션 */}
+          {/* 아코디언 섹션들 (기본 접힘) */}
           {/* ============================================================ */}
-          <motion.section variants={itemVariants} className="mt-6">
-            <h2 className="text-lg font-semibold text-foreground mb-3">
-              항목별 상세 분석
-            </h2>
+          <motion.section variants={itemVariants} className="space-y-4">
 
-            <div className="space-y-3">
-              {results.map((item) => (
-                <AnalysisItemCard
-                  key={item.id}
-                  item={item}
-                  isOpen={openItemId === item.id}
-                  onToggle={() => handleToggleItem(item.id)}
-                />
-              ))}
+            {/* 🦴 3D 스켈레톤 보기 */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setIsSkeletonOpen(!isSkeletonOpen)}
+                className="w-full p-4 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors"
+              >
+                <span className="font-medium text-gray-800 flex items-center gap-2">
+                  <Box className="w-4 h-4 text-blue-500" />
+                  3D 스켈레톤 보기
+                </span>
+                <ChevronDown className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isSkeletonOpen ? 'rotate-180' : ''}`} />
+              </button>
+              <AnimatePresence>
+                {isSkeletonOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="border-t border-gray-200 bg-gray-50"
+                  >
+                    <div className="p-4">
+                      {/* 뷰 버튼 */}
+                      <div className="flex justify-center mb-4">
+                        <div className="flex gap-1 bg-white border p-1 rounded-lg">
+                          {(['front', 'side'] as const).map((view) => (
+                            <button
+                              key={view}
+                              onClick={() => setSkeleton3DView(view)}
+                              className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                                skeleton3DView === view
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'text-muted-foreground hover:bg-gray-100'
+                              }`}
+                            >
+                              {view === 'front' ? '정면' : '측면'}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => setUse3DModel(!use3DModel)}
+                          className="ml-2 px-3 py-1.5 text-xs font-medium rounded-lg border bg-white hover:bg-gray-50"
+                        >
+                          {use3DModel ? '3D 모델' : '스틱'}
+                        </button>
+                      </div>
+
+                      {/* 3D 뷰어 */}
+                      <div className="flex justify-center">
+                        {displayLandmarks[skeleton3DView] ? (
+                          use3DModel ? (
+                            <Skeleton3DModel
+                              landmarks={displayLandmarks[skeleton3DView]}
+                              viewMode={skeleton3DView}
+                              width={320}
+                              height={400}
+                            />
+                          ) : (
+                            <Skeleton3D
+                              landmarks={displayLandmarks[skeleton3DView]}
+                              viewMode={skeleton3DView}
+                              width={320}
+                              height={400}
+                            />
+                          )
+                        ) : (
+                          <div className="w-[320px] h-[400px] bg-gray-200 rounded-lg flex items-center justify-center">
+                            <p className="text-sm text-gray-500">데이터 없음</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
+
+            {/* 📐 상세 각도 분석 */}
+            {jointAngles && (
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+                  className="w-full p-4 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors"
+                >
+                  <span className="font-medium text-gray-800 flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-blue-500" />
+                    상세 각도 분석
+                    <span className="text-xs text-muted-foreground ml-1">ROM {romScore}%</span>
+                  </span>
+                  <ChevronDown className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isAdvancedOpen ? 'rotate-180' : ''}`} />
+                </button>
+                <AnimatePresence>
+                  {isAdvancedOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="border-t border-gray-200 bg-gray-50"
+                    >
+                      <div className="p-4">
+                        <AdvancedReport
+                          jointAngles={jointAngles}
+                          romResults={romResults}
+                          asymmetryResults={asymmetryResults}
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+
+            {/* 좌우 균형 (별도 아코디언) */}
+            {asymmetryResults.length > 0 && (
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => setIsBalanceOpen(!isBalanceOpen)}
+                  className="w-full p-4 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors"
+                >
+                  <span className="font-medium text-gray-800 flex items-center gap-2">
+                    <Scale className="w-4 h-4 text-blue-500" />
+                    좌우 균형
+                    <span className="text-xs text-muted-foreground ml-1">균형 {asymmetryScore}점</span>
+                  </span>
+                  <ChevronDown className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isBalanceOpen ? 'rotate-180' : ''}`} />
+                </button>
+                <AnimatePresence>
+                  {isBalanceOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="border-t border-gray-200 bg-gray-50"
+                    >
+                      <div className="p-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* [MVP] 어깨만 표시 - 고관절/무릎은 추후 활성화 */}
+                          {asymmetryResults
+                            .filter((asym) => asym.joint === '어깨')
+                            .map((asym, idx) => (
+                              <BalanceCard
+                                key={idx}
+                                label={asym.joint}
+                                percentDiff={asym.percentDiff}
+                                dominantSide={asym.dominantSide}
+                              />
+                            ))}
+                        </div>
+                        <Card className="mt-3 bg-white">
+                          <CardContent className="p-3">
+                            <p className="text-sm text-foreground">{asymmetrySummary}</p>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+
+            {/* 📊 항목별 상세 분석 */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setIsDetailedOpen(!isDetailedOpen)}
+                className="w-full p-4 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors"
+              >
+                <span className="font-medium text-gray-800 flex items-center gap-2">
+                  <Target className="w-4 h-4 text-blue-500" />
+                  항목별 상세 분석
+                  <span className="text-xs text-muted-foreground ml-1">정상 {normalCount}개 · 주의 {warningCount}개</span>
+                </span>
+                <ChevronDown className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isDetailedOpen ? 'rotate-180' : ''}`} />
+              </button>
+              <AnimatePresence>
+                {isDetailedOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="border-t border-gray-200 bg-gray-50"
+                  >
+                    <div className="p-4 space-y-3">
+                      {results.map((item, index) => (
+                        <AnalysisItemCard
+                          key={item.id}
+                          item={item}
+                          isOpen={openItemId === item.id}
+                          onToggle={() => handleToggleItem(item.id)}
+                          index={index}
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
           </motion.section>
 
           {/* 팁 카드 */}
-          <motion.section variants={itemVariants} className="mt-5">
-            <Card className="bg-primary/5 border-primary/20">
-              <CardContent className="p-4">
-                <p className="text-sm text-foreground">
-                  <strong className="text-primary">오늘의 팁</strong>
-                  <span className="mx-2">|</span>
-                  하루 10분씩 스트레칭을 하면 자세 개선에 효과적이에요!
-                </p>
-              </CardContent>
-            </Card>
+          <motion.section variants={itemVariants}>
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+              <p className="text-sm text-blue-800">
+                <strong>💡 팁</strong> · 하루 10분씩 스트레칭을 하면 자세 개선에 효과적이에요!
+              </p>
+            </div>
           </motion.section>
         </motion.div>
 
         {/* 하단 액션 버튼 */}
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100">
-          <div className="flex gap-3 max-w-lg mx-auto">
-            <Button
-              variant="outline"
-              className="flex-1 h-12"
+          <div className="flex gap-3">
+            <button
+              className="flex-1 py-3 flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-600 font-medium rounded-2xl border border-gray-200 shadow-sm transition-all"
               onClick={handleDownloadPDF}
             >
-              <FileText className="w-5 h-5 mr-2" />
+              <FileText className="w-5 h-5" />
               PDF 저장
-            </Button>
+            </button>
 
-            <Button
-              className="flex-1 h-12"
+            <button
+              className="flex-1 py-3 flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-medium rounded-2xl border border-emerald-100 shadow-sm transition-all"
               onClick={() => router.push('/exercise')}
             >
-              <Dumbbell className="w-5 h-5 mr-2" />
+              <Dumbbell className="w-5 h-5" />
               맞춤 운동 시작
-            </Button>
+            </button>
           </div>
         </div>
       </div>

@@ -329,11 +329,11 @@ function analyzeForwardHead(distanceCm: number): AnalysisItem {
   } else if (score >= 80) {
     description = '목 위치가 양호해요';
     diagnosis = `머리가 약간(${distanceCm.toFixed(1)}cm) 앞으로 나와 있지만 정상 범위입니다.`;
-    recommendation = '간단한 목 스트레칭';
+    recommendation = '간단한 거북목 교정';
   } else if (score >= 70) {
     description = '경미한 거북목 경향이 있어요';
     diagnosis = `머리가 어깨보다 ${distanceCm.toFixed(1)}cm 앞에 위치합니다. 장시간 유지 시 목 피로감이 있을 수 있습니다.`;
-    recommendation = '목 스트레칭 + 자세 교정';
+    recommendation = '거북목 교정 + 자세 교정';
   } else if (score >= 55) {
     description = '거북목이에요. 교정이 필요해요';
     diagnosis = `머리가 어깨보다 ${distanceCm.toFixed(1)}cm 앞으로 나와 있습니다. 목에 약 ${Math.round(distanceCm * 2)}kg의 추가 하중이 걸리고 있습니다.`;
@@ -375,11 +375,11 @@ function analyzeShoulderTilt(diffCm: number): AnalysisItem {
   } else if (score >= 75) {
     description = '어깨 균형이 양호해요';
     diagnosis = `좌우 어깨 높이 차이가 ${diffCm.toFixed(1)}cm로 정상 범위입니다.`;
-    recommendation = '어깨 스트레칭';
+    recommendation = '라운드숄더 교정';
   } else if (score >= 55) {
     description = '어깨가 살짝 틀어져 있어요';
     diagnosis = `좌우 어깨 높이 차이가 ${diffCm.toFixed(1)}cm입니다. 한쪽 어깨에 힘이 더 들어가는 습관이 있을 수 있습니다.`;
-    recommendation = '어깨 교정 운동';
+    recommendation = '라운드숄더 교정';
   } else {
     description = '어깨 균형이 많이 틀어졌어요';
     diagnosis = `좌우 어깨 높이 차이가 ${diffCm.toFixed(1)}cm로 상당한 불균형이 있습니다. 척추 정렬에 영향을 줄 수 있습니다.`;

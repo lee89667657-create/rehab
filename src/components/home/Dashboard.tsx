@@ -11,16 +11,16 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera,
   Dumbbell,
   ChevronRight,
+  ChevronDown,
   LogOut,
   Calendar,
   Lightbulb,
   MoveVertical,
-  StretchHorizontal,
   LucideIcon,
   Target,
 } from 'lucide-react';
@@ -104,18 +104,18 @@ function getScoreMessage(score: number): { text: string; subText: string } {
 const allExercises: Exercise[] = [
   {
     id: 'forward_head',
-    name: '목 스트레칭',
+    name: '거북목 교정',
     duration: '5분',
     difficulty: '초급',
-    description: '거북목 교정에 효과적',
+    description: '거북목 개선에 효과적',
     icon: MoveVertical,
   },
   {
     id: 'round_shoulder',
-    name: '어깨 교정',
+    name: '라운드숄더 교정',
     duration: '10분',
     difficulty: '중급',
-    description: '라운드숄더 개선',
+    description: '라운드숄더 개선에 효과적',
     icon: Dumbbell,
   },
   {
@@ -125,14 +125,6 @@ const allExercises: Exercise[] = [
     difficulty: '중급',
     description: '골반 균형 회복',
     icon: Target,
-  },
-  {
-    id: 'full_body',
-    name: '전신 스트레칭',
-    duration: '15분',
-    difficulty: '초급',
-    description: '전체적인 유연성 향상',
-    icon: StretchHorizontal,
   },
 ];
 
@@ -232,6 +224,7 @@ export default function Dashboard() {
   const [weeklyRecord, setWeeklyRecord] = useState<WeeklyRecordItem[]>(() =>
     getDefaultWeeklyRecord()
   );
+  const [isWeeklyOpen, setIsWeeklyOpen] = useState(false);
 
   const rawName = user?.user_metadata?.name;
   const isValidName =
@@ -266,9 +259,6 @@ export default function Dashboard() {
 
   const completedDays = weeklyRecord.filter((r) => r.completed).length;
   const overallScore = analysisResult?.overallScore ?? 0;
-  const normalItemsCount =
-    analysisResult?.items.filter((item) => item.grade === 'good').length ?? 0;
-  const totalItemsCount = analysisResult?.items.length ?? 0;
   const scoreMessage = getScoreMessage(overallScore);
 
   const recommendedExercises = useMemo(() => {
@@ -307,6 +297,9 @@ export default function Dashboard() {
               <h1 className="text-xl font-semibold text-gray-800">
                 안녕하세요, {userName}님
               </h1>
+              <p className="text-sm text-gray-500 mt-1">
+                오늘도 건강한 자세 만들어봐요!
+              </p>
             </div>
 
             <button
@@ -320,67 +313,12 @@ export default function Dashboard() {
         </motion.header>
 
         {/* 메인 콘텐츠 */}
-        <div className="px-6 py-6 space-y-5">
-          {/* 메인 점수 카드 */}
-          <motion.section variants={itemVariants}>
-            {analysisResult ? (
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                <div className="flex items-center gap-4">
-                  <ScoreCircle value={overallScore} size={90} strokeWidth={7} />
-
-                  <div className="flex-1">
-                    <span className="text-xs text-gray-400">종합 자세 점수</span>
-
-                    <h2 className="text-lg font-semibold text-gray-800 mt-0.5">
-                      {scoreMessage.text}
-                    </h2>
-
-                    <p className="text-sm text-gray-500 mt-0.5">
-                      {scoreMessage.subText}
-                    </p>
-                  </div>
-                </div>
-
-                <Link
-                  href="/result"
-                  className="mt-4 flex items-center justify-center gap-1 w-full py-2.5 bg-white hover:bg-blue-50 text-blue-500 font-medium rounded-lg border border-gray-200 transition-colors"
-                >
-                  상세 결과 보기
-                  <ChevronRight className="w-4 h-4" />
-                </Link>
-              </div>
-            ) : (
-              <div className="bg-gradient-to-r from-blue-500 to-blue-400 rounded-xl px-6 py-6 text-white">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center">
-                    <Camera className="w-6 h-6" />
-                  </div>
-                  <div className="flex-1">
-                    <h2 className="text-lg font-semibold">
-                      첫 분석을 시작해보세요
-                    </h2>
-                    <p className="text-blue-100 text-sm mt-0.5">
-                      AI가 자세를 분석하고 맞춤 운동을 추천해드려요
-                    </p>
-                  </div>
-                </div>
-
-                <Link
-                  href="/analyze"
-                  className="mt-4 flex items-center justify-center gap-1 w-full py-2.5 bg-white text-blue-600 font-medium rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  자세 분석 시작하기
-                  <ChevronRight className="w-4 h-4" />
-                </Link>
-              </div>
-            )}
-          </motion.section>
-
+        <div className="px-6 py-6 space-y-6">
           {/* 퀵 액션 버튼 */}
           <motion.section className="grid grid-cols-2 gap-3" variants={itemVariants}>
             <Link
               href="/analyze"
-              className="flex items-center justify-center gap-2 h-14 bg-white hover:bg-blue-50 hover:border-blue-300 text-gray-700 hover:text-blue-600 font-medium rounded-xl border border-gray-200 transition-all"
+              className="flex items-center justify-center gap-2 py-4 bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium rounded-2xl border border-blue-100 shadow-sm transition-all"
             >
               <Camera className="w-4 h-4" />
               <span className="text-sm">{analysisResult ? '다시 분석' : '자세 분석'}</span>
@@ -388,7 +326,7 @@ export default function Dashboard() {
 
             <Link
               href="/exercise"
-              className="flex items-center justify-center gap-2 h-14 bg-white hover:bg-blue-50 hover:border-blue-300 text-gray-700 hover:text-blue-600 font-medium rounded-xl border border-gray-200 transition-all"
+              className="flex items-center justify-center gap-2 py-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-medium rounded-2xl border border-emerald-100 shadow-sm transition-all"
             >
               <Dumbbell className="w-4 h-4" />
               <span className="text-sm">{currentExerciseIndex > 0 ? '이어하기' : '운동 시작'}</span>
@@ -417,9 +355,9 @@ export default function Dashboard() {
                   transition={{ delay: 0.05 * index }}
                 >
                   <Link href={`/exercise?type=${exercise.id}`}>
-                    <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center hover:border-blue-300 hover:bg-blue-50/30 transition-all group">
+                    <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center hover:border-blue-300 hover:bg-gray-50 transition-all group">
                       {/* 왼쪽 컬러 바 */}
-                      <div className={`w-1 h-12 rounded-full mr-4 ${
+                      <div className={`w-1.5 h-12 rounded-full mr-4 ${
                         exercise.difficulty === '초급'
                           ? 'bg-emerald-400'
                           : exercise.difficulty === '중급'
@@ -435,19 +373,8 @@ export default function Dashboard() {
                         <p className="text-sm text-gray-500">{exercise.description}</p>
                       </div>
 
-                      {/* 오른쪽 난이도 + 화살표 */}
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs px-2 py-0.5 rounded ${
-                          exercise.difficulty === '초급'
-                            ? 'bg-emerald-50 text-emerald-600'
-                            : exercise.difficulty === '중급'
-                              ? 'bg-blue-50 text-blue-600'
-                              : 'bg-amber-50 text-amber-600'
-                        }`}>
-                          {exercise.difficulty}
-                        </span>
-                        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-400 transition-colors" />
-                      </div>
+                      {/* 오른쪽 화살표 */}
+                      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-400 transition-colors" />
                     </div>
                   </Link>
                 </motion.div>
@@ -455,48 +382,66 @@ export default function Dashboard() {
             </div>
           </motion.section>
 
-          {/* 이번 주 기록 - 컴팩트 버전 */}
+          {/* 이번 주 기록 - 아코디언 */}
           <motion.section variants={itemVariants}>
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="font-semibold text-gray-800 text-sm">이번 주</span>
-                <Link href="/stats" className="text-xs text-gray-400 hover:text-blue-500 flex items-center gap-1 transition-colors">
-                  통계
-                  <ChevronRight className="w-3 h-3" />
-                </Link>
-              </div>
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <button
+                onClick={() => setIsWeeklyOpen(!isWeeklyOpen)}
+                className="w-full p-4 flex justify-between items-center hover:bg-gray-50 transition-colors"
+              >
+                <span className="font-semibold text-gray-800 text-sm">이번 주 기록</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-blue-500 font-medium">{Math.round((completedDays / 7) * 100)}%</span>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isWeeklyOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+              <AnimatePresence>
+                {isWeeklyOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="border-t border-gray-100"
+                  >
+                    <div className="p-4 pt-3">
+                      {/* 주간 막대 - 작은 버전 */}
+                      <div className="flex justify-between items-end gap-1.5">
+                        {weeklyRecord.map((record) => (
+                          <div key={record.date} className="flex flex-col items-center gap-1 flex-1">
+                            <div
+                              className={`w-full max-w-[24px] h-8 rounded ${
+                                record.completed
+                                  ? 'bg-blue-500'
+                                  : record.isToday
+                                    ? 'bg-blue-100'
+                                    : 'bg-gray-100'
+                              }`}
+                            />
+                            <span
+                              className={`text-[10px] ${
+                                record.isToday
+                                  ? 'text-blue-500 font-semibold'
+                                  : 'text-gray-400'
+                              }`}
+                            >
+                              {record.day}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
 
-              {/* 주간 막대 - 작은 버전 */}
-              <div className="flex justify-between items-end gap-1.5">
-                {weeklyRecord.map((record) => (
-                  <div key={record.date} className="flex flex-col items-center gap-1 flex-1">
-                    <div
-                      className={`w-full max-w-[24px] h-8 rounded ${
-                        record.completed
-                          ? 'bg-blue-500'
-                          : record.isToday
-                            ? 'bg-blue-100'
-                            : 'bg-gray-100'
-                      }`}
-                    />
-                    <span
-                      className={`text-[10px] ${
-                        record.isToday
-                          ? 'text-blue-500 font-semibold'
-                          : 'text-gray-400'
-                      }`}
-                    >
-                      {record.day}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* 주간 달성률 */}
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-xs text-gray-400">주간 달성률</span>
-                <span className="text-sm font-semibold text-gray-800">{Math.round((completedDays / 7) * 100)}%</span>
-              </div>
+                      {/* 통계 링크 */}
+                      <div className="mt-3 flex justify-end">
+                        <Link href="/stats" className="text-xs text-gray-400 hover:text-blue-500 flex items-center gap-1 transition-colors">
+                          통계 보기
+                          <ChevronRight className="w-3 h-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.section>
 

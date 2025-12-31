@@ -116,7 +116,7 @@ const EXERCISE_PROGRAMS: ExerciseProgram[] = [
     exercises: [
       { id: 'chin-tuck', name: '턱 당기기', sets: 3, reps: '10초 유지', description: '이중턱 만들기 (타이머)' },
       { id: 'shoulder-blade-squeeze', name: '견갑골 모으기', sets: 3, reps: '5초 유지', description: '견갑골 모으기 (타이머)' },
-      { id: 'neck-side-stretch', name: '목 옆 스트레칭', sets: 2, reps: 8, description: '목 스트레칭 (실시간 분석)' },
+      { id: 'neck-side-stretch', name: '목 옆 스트레칭', sets: 2, reps: 8, description: '거북목 교정 (실시간 분석)' },
       { id: 'shoulder-squeeze', name: '어깨 으쓱하기', sets: 3, reps: 12, description: '어깨 으쓱하기 (실시간 분석)' },
       { id: 'arm-raise', name: '팔 들어올리기', sets: 2, reps: 10, description: '팔 들어올리기 (실시간 분석)' },
       { id: 'squat', name: '스쿼트', sets: 3, reps: 10, description: '스쿼트 (실시간 분석)' },
