@@ -35,13 +35,18 @@ import {
 import {
   getCountableExerciseById,
   getTimerExerciseById,
+  getSequenceExerciseById,
   type CountableExercise,
   type TimerExercise as TimerExerciseType,
+  type SequenceExercise as SequenceExerciseType,
   type ExerciseResult,
 } from '@/lib/exerciseData';
 import RealTimeExercise from '@/components/exercise/RealTimeExercise';
 import TimerExercise from '@/components/exercise/TimerExercise';
+import SequenceExercise from '@/components/exercise/SequenceExercise';
+import DifficultySelector from '@/components/exercise/DifficultySelector';
 import AppHeader from '@/components/layout/AppHeader';
+import { useExerciseSettings } from '@/hooks/useExerciseSettings';
 
 // shadcn/ui 컴포넌트
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,10 +69,21 @@ export default function RealTimeExercisePage() {
 
   const exerciseId = params.id as string;
 
-  const [exercise, setExercise] = useState<CountableExercise | TimerExerciseType | null>(null);
-  const [exerciseType, setExerciseType] = useState<'countable' | 'timer' | null>(null);
+  const [exercise, setExercise] = useState<CountableExercise | TimerExerciseType | SequenceExerciseType | null>(null);
+  const [exerciseType, setExerciseType] = useState<'countable' | 'timer' | 'sequence' | null>(null);
   const [pageState, setPageState] = useState<PageState>('info');
   const [result, setResult] = useState<ExerciseResult | null>(null);
+
+  // 난이도 설정 hook
+  const {
+    difficulty,
+    setDifficulty,
+    isExpertMode,
+    toggleExpertMode,
+    settings: exerciseSettings,
+    updateSettings,
+    resetSettings,
+  } = useExerciseSettings({ exerciseId });
 
   // ========================================
   // 운동 데이터 로드
@@ -87,6 +103,15 @@ export default function RealTimeExercisePage() {
     if (timerData) {
       setExercise(timerData);
       setExerciseType('timer');
+      return;
+    }
+
+    // 시퀀스 운동에서 검색
+    const sequenceData = getSequenceExerciseById(exerciseId);
+    if (sequenceData) {
+      setExercise(sequenceData);
+      setExerciseType('sequence');
+      return;
     }
   }, [exerciseId]);
 
@@ -160,12 +185,24 @@ export default function RealTimeExercisePage() {
       );
     }
 
+    // 시퀀스 기반 운동 (Y-T-W 등)
+    if (exerciseType === 'sequence') {
+      return (
+        <SequenceExercise
+          exercise={exercise as SequenceExerciseType}
+          onComplete={handleComplete}
+          onCancel={handleCancel}
+        />
+      );
+    }
+
     // 카운팅 기반 운동
     return (
       <RealTimeExercise
         exercise={exercise as CountableExercise}
         onComplete={handleComplete}
         onCancel={handleCancel}
+        angleSettings={exerciseSettings}
       />
     );
   }
@@ -306,7 +343,7 @@ export default function RealTimeExercisePage() {
               </Button>
 
               <Button
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push('/')}
                 variant="ghost"
                 className="w-full h-12"
               >
@@ -328,27 +365,29 @@ export default function RealTimeExercisePage() {
     <>
       <AppHeader />
       <div className="min-h-screen bg-background pb-32 pt-14">
-        {/* 헤더 */}
-        <div className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground p-6 pb-16">
+        {/* 헤더 - 미니멀 스타일 */}
+        <div className="p-6">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => router.back()}
-            className="text-primary-foreground hover:bg-primary-foreground/20 mb-4"
+            className="mb-4"
           >
             <ArrowLeft className="w-6 h-6" />
           </Button>
 
           <h1 className="text-2xl font-bold mb-2">{exercise.name}</h1>
-          <p className="text-primary-foreground/80 mb-4">{exercise.description}</p>
+          <p className="text-muted-foreground mb-4">{exercise.description}</p>
 
-          <div className="flex gap-4 flex-wrap">
+          <div className="flex gap-4 flex-wrap text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <Clock className="w-4 h-4" />
               <span className="text-sm">
                 {exerciseType === 'timer'
                   ? `약 ${Math.round(((exercise as TimerExerciseType).holdTime * exercise.sets + exercise.restTime * (exercise.sets - 1)) / 60)}분`
-                  : `약 ${Math.round(((exercise as CountableExercise).duration * exercise.sets + exercise.restTime * (exercise.sets - 1)) / 60)}분`
+                  : exerciseType === 'sequence'
+                    ? `약 ${Math.round((((exercise as SequenceExerciseType).poses.reduce((sum, p) => sum + p.holdTime, 0) * (exercise as SequenceExerciseType).cycles * exercise.sets) + exercise.restTime * (exercise.sets - 1)) / 60)}분`
+                    : `약 ${Math.round(((exercise as CountableExercise).duration * exercise.sets + exercise.restTime * (exercise.sets - 1)) / 60)}분`
                 }
               </span>
             </div>
@@ -357,7 +396,9 @@ export default function RealTimeExercisePage() {
               <span className="text-sm">
                 {exerciseType === 'timer'
                   ? `${exercise.sets}세트 x ${(exercise as TimerExerciseType).holdTime}초 유지`
-                  : `${exercise.sets}세트 x ${(exercise as CountableExercise).reps}회`
+                  : exerciseType === 'sequence'
+                    ? `${exercise.sets}세트 x ${(exercise as SequenceExerciseType).cycles}사이클`
+                    : `${exercise.sets}세트 x ${(exercise as CountableExercise).reps}회`
                 }
               </span>
             </div>
@@ -369,9 +410,31 @@ export default function RealTimeExercisePage() {
         </div>
 
         {/* 컨텐츠 */}
-        <div className="px-4 -mt-10">
+        <div className="px-4">
+          {/* 측면 촬영 안내 (스쿼트 등) */}
+          {exerciseType === 'countable' && (exercise as CountableExercise).cameraDirection === 'side' && (
+            <Card className="mb-4 border-amber-500/50 bg-amber-500/10">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center flex-shrink-0">
+                    <Camera className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1 text-amber-600 dark:text-amber-400">
+                      측면 촬영이 필요해요
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      정확한 각도 분석을 위해 <strong>옆모습이 보이도록</strong> 카메라를 배치해주세요. 
+                      무릎 각도를 정확히 측정할 수 있어요.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* 실시간 분석 모드 안내 */}
-          <Card className="mb-4 border-primary/20 bg-primary/5">
+          <Card className="mb-4">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
@@ -384,13 +447,28 @@ export default function RealTimeExercisePage() {
                   <p className="text-sm text-muted-foreground">
                     {exerciseType === 'timer'
                       ? `카메라로 자세를 확인하면서 ${(exercise as TimerExerciseType).holdTime}초간 자세를 유지합니다. 음성 안내에 따라 운동하세요.`
-                      : '카메라로 자세를 분석하고 자동으로 횟수를 카운팅합니다. 전신이 보이도록 카메라 위치를 조정해주세요.'
+                      : (exercise as CountableExercise).analysisType === 'angle'
+                        ? '관절 각도를 분석하여 정확하게 횟수를 카운팅합니다.'
+                        : '카메라로 자세를 분석하고 자동으로 횟수를 카운팅합니다.'
                     }
                   </p>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* 난이도 설정 (카운팅 운동만) */}
+          {exerciseType === 'countable' && (
+            <DifficultySelector
+              difficulty={difficulty}
+              onDifficultyChange={setDifficulty}
+              isExpertMode={isExpertMode}
+              onExpertModeToggle={toggleExpertMode}
+              settings={exerciseSettings}
+              onSettingsChange={updateSettings}
+              onReset={resetSettings}
+            />
+          )}
 
           {/* 자세 포인트 */}
           <Card className="mb-4">
@@ -449,7 +527,7 @@ export default function RealTimeExercisePage() {
           </Card>
 
           {/* 준비 안내 */}
-          <Card className="mb-4 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+          <Card className="mb-4 bg-yellow-500/10 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
             <CardContent className="p-4">
               <h3 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
                 시작 전 확인사항

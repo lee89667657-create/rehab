@@ -17,7 +17,6 @@ import {
   Dumbbell,
   ChevronRight,
   ChevronDown,
-  LogOut,
   Calendar,
   Lightbulb,
   MoveVertical,
@@ -27,7 +26,7 @@ import {
 import useStore, { useAnalysisResult } from '@/store/useStore';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getWeeklyRecords } from '@/lib/supabase';
-import AppHeader from '@/components/layout/AppHeader';
+// AppHeader는 SidebarLayout에서 처리됨
 import { LOWER_BODY_ANALYSIS_ENABLED } from '@/constants/features';
 
 // ============================================================
@@ -199,14 +198,14 @@ function ScoreCircle({ value, size = 120, strokeWidth = 10 }: ScoreCircleProps) 
 
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <motion.span
-          className="text-4xl font-bold text-gray-800"
+          className="text-4xl font-bold text-foreground"
           initial={{ opacity: 0, scale: 0.5 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.4 }}
         >
           {value}
         </motion.span>
-        <span className="text-sm text-gray-500">점</span>
+        <span className="text-sm text-muted-foreground">점</span>
       </div>
     </div>
   );
@@ -217,14 +216,19 @@ function ScoreCircle({ value, size = 120, strokeWidth = 10 }: ScoreCircleProps) 
 // ============================================================
 
 export default function Dashboard() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { user, signOut } = useAuth();
-  const analysisResult = useAnalysisResult();
+  const storeAnalysisResult = useAnalysisResult();
   const currentExerciseIndex = useStore((state) => state.currentExerciseIndex);
 
   const [weeklyRecord, setWeeklyRecord] = useState<WeeklyRecordItem[]>(() =>
     getDefaultWeeklyRecord()
   );
   const [isWeeklyOpen, setIsWeeklyOpen] = useState(false);
+  const [latestAnalysis, setLatestAnalysis] = useState<{
+    overallScore: number;
+    items: Array<{ id: string; name: string; grade: string; score: number }>;
+  } | null>(null);
 
   const rawName = user?.user_metadata?.name;
   const isValidName =
@@ -234,6 +238,32 @@ export default function Dashboard() {
   const userName = isValidName
     ? rawName
     : user?.email?.split('@')[0] || '사용자';
+
+  // Supabase에서 최근 분석 결과 가져오기
+  useEffect(() => {
+    const fetchLatestAnalysis = async () => {
+      if (!user) return;
+
+      try {
+        const { getLatestAnalysisResult } = await import('@/lib/supabase');
+        const result = await getLatestAnalysisResult(user.id);
+        
+        if (result) {
+          setLatestAnalysis({
+            overallScore: result.overall_score,
+            items: [
+              { id: 'forward_head', name: '거북목', grade: result.head_forward >= 80 ? 'good' : result.head_forward >= 60 ? 'warning' : 'danger', score: result.head_forward },
+              { id: 'shoulder_tilt', name: '라운드숄더', grade: result.shoulder_balance >= 80 ? 'good' : result.shoulder_balance >= 60 ? 'warning' : 'danger', score: result.shoulder_balance },
+            ],
+          });
+        }
+      } catch (error) {
+        console.error('최근 분석 결과 조회 실패:', error);
+      }
+    };
+
+    fetchLatestAnalysis();
+  }, [user]);
 
   useEffect(() => {
     const fetchWeeklyRecords = async () => {
@@ -257,6 +287,9 @@ export default function Dashboard() {
     fetchWeeklyRecords();
   }, [user]);
 
+  // store 또는 Supabase에서 가져온 분석 결과 사용
+  const analysisResult = storeAnalysisResult || latestAnalysis;
+  
   const completedDays = weeklyRecord.filter((r) => r.completed).length;
   const overallScore = analysisResult?.overallScore ?? 0;
   const scoreMessage = getScoreMessage(overallScore);
@@ -266,59 +299,119 @@ export default function Dashboard() {
 
     const warningItems = analysisResult.items
       .filter((item) => item.grade !== 'good')
-      .map((item) => item.id);
+      .map((item) => {
+        // ID 매핑: shoulder_tilt -> round_shoulder
+        if (item.id === 'shoulder_tilt') return 'round_shoulder';
+        return item.id;
+      });
 
     if (warningItems.length === 0) return defaultExercises;
 
-    return defaultExercises.filter((ex) => warningItems.includes(ex.id));
+    const filtered = defaultExercises.filter((ex) => warningItems.includes(ex.id));
+    // 필터 결과가 없으면 기본 운동 표시
+    return filtered.length > 0 ? filtered : defaultExercises;
   }, [analysisResult]);
 
   return (
     <>
-      <AppHeader />
-
       <motion.div
-        className="min-h-screen bg-slate-50 pb-32 pt-14"
+        className="min-h-screen bg-background pb-32"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
         {/* 상단 헤더 */}
         <motion.header
-          className="bg-white px-6 pt-6 pb-5 border-b border-gray-100"
+          className="bg-card px-6 pt-6 pb-5 border-b border-border"
           variants={itemVariants}
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500 flex items-center gap-1.5 mb-1">
+              <p className="text-sm text-muted-foreground flex items-center gap-1.5 mb-1">
                 <Calendar className="w-4 h-4" />
                 {getTodayDateString()}
               </p>
-              <h1 className="text-xl font-semibold text-gray-800">
+              <h1 className="text-xl font-semibold text-foreground">
                 안녕하세요, {userName}님
               </h1>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 오늘도 건강한 자세 만들어봐요!
               </p>
             </div>
-
-            <button
-              onClick={() => signOut()}
-              className="w-10 h-10 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
-              title="로그아웃"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
           </div>
         </motion.header>
 
         {/* 메인 콘텐츠 */}
         <div className="px-6 py-6 space-y-6">
+          {/* 최근 분석 결과 카드 */}
+          <motion.section variants={itemVariants}>
+            {analysisResult ? (
+              <Link href="/result?from=history">
+                <div className="bg-card rounded-2xl border border-border shadow-sm p-5 hover:border-blue-200 transition-all">
+                  <div className="flex items-center gap-5">
+                    {/* 점수 원형 */}
+                    <ScoreCircle value={overallScore} size={90} strokeWidth={8} />
+                    
+                    {/* 정보 */}
+                    <div className="flex-1">
+                      <p className="text-sm text-muted-foreground mb-1">최근 분석 결과</p>
+                      <p className="text-lg font-semibold text-foreground mb-1">
+                        {scoreMessage.text}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{scoreMessage.subText}</p>
+                      
+                      {/* 주의 항목 표시 */}
+                      {analysisResult.items.filter(item => item.grade !== 'good').length > 0 && (
+                        <div className="flex gap-2 mt-3">
+                          {analysisResult.items
+                            .filter(item => item.grade !== 'good')
+                            .slice(0, 2)
+                            .map(item => (
+                              <span
+                                key={item.id}
+                                className={`text-xs px-2 py-1 rounded-full ${
+                                  item.grade === 'danger'
+                                    ? 'bg-red-500/10 text-red-600'
+                                    : 'bg-amber-500/100/20 text-amber-500'
+                                }`}
+                              >
+                                {item.name} 주의
+                              </span>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                </div>
+              </Link>
+            ) : (
+              <div className="bg-card rounded-2xl border border-border p-5">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-blue-500/100/10 flex items-center justify-center">
+                    <Camera className="w-7 h-7 text-blue-500" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-foreground mb-1">아직 분석 기록이 없어요</p>
+                    <p className="text-sm text-muted-foreground">자세 분석을 시작해보세요!</p>
+                  </div>
+                  <Link
+                    href="/analyze"
+                    className="px-4 py-2 bg-blue-500/100 hover:bg-blue-600 text-white text-sm font-medium rounded-xl transition-colors"
+                  >
+                    분석하기
+                  </Link>
+                </div>
+              </div>
+            )}
+          </motion.section>
+
           {/* 퀵 액션 버튼 */}
           <motion.section className="grid grid-cols-2 gap-3" variants={itemVariants}>
             <Link
               href="/analyze"
-              className="flex items-center justify-center gap-2 py-4 bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium rounded-2xl border border-blue-100 shadow-sm transition-all"
+              className="flex items-center justify-center gap-2 py-4 bg-blue-500/100/10 hover:bg-blue-500/200/100/20 text-blue-500 font-medium rounded-2xl border border-blue-500/20 shadow-sm transition-all"
             >
               <Camera className="w-4 h-4" />
               <span className="text-sm">{analysisResult ? '다시 분석' : '자세 분석'}</span>
@@ -326,7 +419,7 @@ export default function Dashboard() {
 
             <Link
               href="/exercise"
-              className="flex items-center justify-center gap-2 py-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-medium rounded-2xl border border-emerald-100 shadow-sm transition-all"
+              className="flex items-center justify-center gap-2 py-4 bg-emerald-500/100/10 hover:bg-emerald-500/100/20 text-emerald-500 font-medium rounded-2xl border border-emerald-500/20 shadow-sm transition-all"
             >
               <Dumbbell className="w-4 h-4" />
               <span className="text-sm">{currentExerciseIndex > 0 ? '이어하기' : '운동 시작'}</span>
@@ -336,10 +429,10 @@ export default function Dashboard() {
           {/* 추천 운동 - 새로운 Calm 스타일 */}
           <motion.section variants={itemVariants}>
             <div className="flex items-center justify-between mb-3">
-              <span className="font-semibold text-gray-800">
+              <span className="font-semibold text-foreground">
                 {analysisResult ? '맞춤 추천 운동' : '추천 운동'}
               </span>
-              <Link href="/exercise" className="text-sm text-gray-400 hover:text-blue-500 flex items-center gap-0.5 transition-colors">
+              <Link href="/exercise" className="text-sm text-muted-foreground hover:text-blue-500 flex items-center gap-0.5 transition-colors">
                 전체 보기
                 <ChevronRight className="w-4 h-4" />
               </Link>
@@ -355,7 +448,7 @@ export default function Dashboard() {
                   transition={{ delay: 0.05 * index }}
                 >
                   <Link href={`/exercise?type=${exercise.id}`}>
-                    <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center hover:border-blue-300 hover:bg-gray-50 transition-all group">
+                    <div className="bg-card border border-border rounded-xl p-4 flex items-center hover:border-blue-500/50 hover:bg-accent transition-all group">
                       {/* 왼쪽 컬러 바 */}
                       <div className={`w-1.5 h-12 rounded-full mr-4 ${
                         exercise.difficulty === '초급'
@@ -367,14 +460,14 @@ export default function Dashboard() {
 
                       {/* 텍스트 정보 */}
                       <div className="flex-1">
-                        <h3 className="font-medium text-gray-800 group-hover:text-blue-600 transition-colors">
+                        <h3 className="font-medium text-foreground group-hover:text-blue-600 transition-colors">
                           {exercise.name}
                         </h3>
-                        <p className="text-sm text-gray-500">{exercise.description}</p>
+                        <p className="text-sm text-muted-foreground">{exercise.description}</p>
                       </div>
 
                       {/* 오른쪽 화살표 */}
-                      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-400 transition-colors" />
+                      <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-blue-400 transition-colors" />
                     </div>
                   </Link>
                 </motion.div>
@@ -384,15 +477,15 @@ export default function Dashboard() {
 
           {/* 이번 주 기록 - 아코디언 */}
           <motion.section variants={itemVariants}>
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
               <button
                 onClick={() => setIsWeeklyOpen(!isWeeklyOpen)}
-                className="w-full p-4 flex justify-between items-center hover:bg-gray-50 transition-colors"
+                className="w-full p-4 flex justify-between items-center hover:bg-accent transition-colors"
               >
-                <span className="font-semibold text-gray-800 text-sm">이번 주 기록</span>
+                <span className="font-semibold text-foreground text-sm">이번 주 기록</span>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-blue-500 font-medium">{Math.round((completedDays / 7) * 100)}%</span>
-                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isWeeklyOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isWeeklyOpen ? 'rotate-180' : ''}`} />
                 </div>
               </button>
               <AnimatePresence>
@@ -402,7 +495,7 @@ export default function Dashboard() {
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.2 }}
-                    className="border-t border-gray-100"
+                    className="border-t border-border"
                   >
                     <div className="p-4 pt-3">
                       {/* 주간 막대 - 작은 버전 */}
@@ -412,17 +505,17 @@ export default function Dashboard() {
                             <div
                               className={`w-full max-w-[24px] h-8 rounded ${
                                 record.completed
-                                  ? 'bg-blue-500'
+                                  ? 'bg-blue-500/100'
                                   : record.isToday
-                                    ? 'bg-blue-100'
-                                    : 'bg-gray-100'
+                                    ? 'bg-blue-500/100/30'
+                                    : 'bg-muted'
                               }`}
                             />
                             <span
                               className={`text-[10px] ${
                                 record.isToday
                                   ? 'text-blue-500 font-semibold'
-                                  : 'text-gray-400'
+                                  : 'text-muted-foreground'
                               }`}
                             >
                               {record.day}
@@ -433,7 +526,7 @@ export default function Dashboard() {
 
                       {/* 통계 링크 */}
                       <div className="mt-3 flex justify-end">
-                        <Link href="/stats" className="text-xs text-gray-400 hover:text-blue-500 flex items-center gap-1 transition-colors">
+                        <Link href="/stats" className="text-xs text-muted-foreground hover:text-blue-500 flex items-center gap-1 transition-colors">
                           통계 보기
                           <ChevronRight className="w-3 h-3" />
                         </Link>
@@ -447,14 +540,14 @@ export default function Dashboard() {
 
           {/* 오늘의 팁 */}
           <motion.section variants={itemVariants}>
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <div className="bg-card rounded-xl border border-border shadow-sm p-4">
               <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 rounded-lg bg-amber-500/100/10 flex items-center justify-center flex-shrink-0">
                   <Lightbulb className="w-5 h-5 text-amber-500" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-800 text-sm mb-1">오늘의 팁</h3>
-                  <p className="text-sm text-gray-500 leading-relaxed">
+                  <h3 className="font-semibold text-foreground text-sm mb-1">오늘의 팁</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     30분마다 간단한 스트레칭을 하면 거북목 예방에 효과적이에요.
                     <span className="text-blue-500 font-medium ml-1">꾸준함이 중요해요.</span>
                   </p>

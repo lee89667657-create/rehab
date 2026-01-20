@@ -51,13 +51,13 @@ export interface ScoreCardProps {
  */
 function getGrade(score: number): { letter: string; label: string; color: string; bgColor: string } {
   if (score >= 95) return { letter: 'S', label: '완벽', color: 'text-purple-600', bgColor: 'bg-purple-100' };
-  if (score >= 90) return { letter: 'A+', label: '훌륭함', color: 'text-emerald-600', bgColor: 'bg-emerald-100' };
-  if (score >= 85) return { letter: 'A', label: '우수', color: 'text-green-600', bgColor: 'bg-green-100' };
+  if (score >= 90) return { letter: 'A+', label: '훌륭함', color: 'text-emerald-600', bgColor: 'bg-emerald-500/20' };
+  if (score >= 85) return { letter: 'A', label: '우수', color: 'text-green-600', bgColor: 'bg-green-500/20' };
   if (score >= 80) return { letter: 'B+', label: '양호', color: 'text-teal-600', bgColor: 'bg-teal-100' };
-  if (score >= 75) return { letter: 'B', label: '보통', color: 'text-blue-600', bgColor: 'bg-blue-100' };
-  if (score >= 70) return { letter: 'C+', label: '노력필요', color: 'text-amber-600', bgColor: 'bg-amber-100' };
-  if (score >= 65) return { letter: 'C', label: '부족', color: 'text-orange-600', bgColor: 'bg-orange-100' };
-  if (score >= 60) return { letter: 'D', label: '미흡', color: 'text-red-500', bgColor: 'bg-red-100' };
+  if (score >= 75) return { letter: 'B', label: '보통', color: 'text-blue-600', bgColor: 'bg-blue-500/20' };
+  if (score >= 70) return { letter: 'C+', label: '노력필요', color: 'text-amber-600', bgColor: 'bg-amber-500/20' };
+  if (score >= 65) return { letter: 'C', label: '부족', color: 'text-orange-600', bgColor: 'bg-orange-500/20' };
+  if (score >= 60) return { letter: 'D', label: '미흡', color: 'text-red-500', bgColor: 'bg-red-500/20' };
   return { letter: 'F', label: '재도전', color: 'text-red-600', bgColor: 'bg-red-200' };
 }
 
@@ -309,7 +309,7 @@ export default function ScoreCard({
         {/* 최고 기록 표시 */}
         {bestScore && totalScore >= bestScore && (
           <motion.div
-            className="flex items-center justify-center gap-2 mb-6 py-2 px-4 bg-amber-50 rounded-xl"
+            className="flex items-center justify-center gap-2 mb-6 py-2 px-4 bg-amber-500/10 rounded-xl"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1.5 }}

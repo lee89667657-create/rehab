@@ -37,7 +37,8 @@ import {
 } from '@/constants/exercises';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { saveExerciseRecord, updateDailyRecord } from '@/lib/supabase';
-import AppHeader from '@/components/layout/AppHeader';
+// AppHeader는 SidebarLayout에서 처리됨
+import SidebarLayout from '@/components/layout/SidebarLayout';
 
 // ============================================================
 // 타입 정의
@@ -131,13 +132,13 @@ function CircularTimer({
           initial={{ scale: 1.05, opacity: 0.8 }}
           animate={{ scale: 1, opacity: 1 }}
           className={`text-6xl font-bold tabular-nums ${
-            isResting ? 'text-amber-600' : 'text-[#1428A0]'
+            isResting ? 'text-amber-600' : 'text-foreground'
           }`}
         >
           {formatTime(current)}
         </motion.span>
         <span className={`text-sm font-semibold mt-1 ${
-          isResting ? 'text-amber-500' : 'text-[#1428A0]'
+          isResting ? 'text-amber-500' : 'text-foreground'
         }`}>
           {isResting ? '휴식 시간' : '운동 중'}
         </span>
@@ -169,10 +170,10 @@ function SetProgress({ currentSet, totalSets }: SetProgressProps) {
               className={`
                 w-4 h-4 rounded-full transition-all duration-300
                 ${isCompleted
-                  ? 'bg-[#1428A0]'
+                  ? 'bg-card'
                   : isCurrent
-                    ? 'bg-[#1428A0] ring-4 ring-[#E8F0FE]'
-                    : 'bg-[#E5E8EB]'
+                    ? 'bg-card ring-4 ring-[#E8F0FE]'
+                    : 'bg-card'
                 }
               `}
               animate={isCurrent ? { scale: [1, 1.15, 1] } : {}}
@@ -186,9 +187,9 @@ function SetProgress({ currentSet, totalSets }: SetProgressProps) {
         })}
       </div>
 
-      <p className="text-[#666666]">
-        <span className="text-3xl font-bold text-[#1A1A1A]">{currentSet}</span>
-        <span className="text-[#999999] text-lg"> / {totalSets}</span>
+      <p className="text-muted-foreground">
+        <span className="text-3xl font-bold text-foreground">{currentSet}</span>
+        <span className="text-muted-foreground text-lg"> / {totalSets}</span>
         <span className="ml-1 text-sm">세트</span>
       </p>
     </div>
@@ -328,18 +329,18 @@ export default function ExercisePlayerPage() {
         `/exercise/${nextExercise.id}?program=${programId}&index=${currentIndex + 1}`
       );
     } else {
-      router.push('/dashboard');
+      router.push('/');
     }
   };
 
   const handleGoHome = () => {
-    router.push('/dashboard');
+    router.push('/');
   };
 
   if (!exercise) {
     return (
-      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-[#1428A0] border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-border border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -348,45 +349,42 @@ export default function ExercisePlayerPage() {
   const hasNextExercise = currentIndex < programExercises.length - 1;
 
   return (
-    <>
-      {/* 앱 공통 헤더 - 로고 + 앱 이름 */}
-      <AppHeader />
-
-      <div className="min-h-screen bg-[#F8F9FA] flex flex-col pt-14">
+    <SidebarLayout>
+      <div className="min-h-screen bg-background flex flex-col">
         {/* ============================================================
             상단 헤더 - 삼성 스타일
             ============================================================ */}
-        <header className="bg-white px-4 py-3 border-b border-[#E5E8EB] flex items-center justify-between">
+        <header className="bg-card px-4 py-3 border-b border-border flex items-center justify-between">
           <button
             onClick={handleClose}
             className="
               w-10 h-10 rounded-xl
-              bg-[#F8F9FA] hover:bg-[#F0F2F5]
-              border border-[#E5E8EB]
+              bg-background hover:bg-accent
+              border border-border
               flex items-center justify-center
               transition-all duration-300
             "
           >
-            <ChevronLeft className="w-5 h-5 text-[#666666]" />
+            <ChevronLeft className="w-5 h-5 text-muted-foreground" />
           </button>
 
           <div className="text-center">
-            <h1 className="text-base font-bold text-[#1A1A1A]">{exercise.name}</h1>
-            <p className="text-xs text-[#999999]">{exercise.nameEn}</p>
+            <h1 className="text-base font-bold text-foreground">{exercise.name}</h1>
+            <p className="text-xs text-muted-foreground">{exercise.nameEn}</p>
           </div>
 
           <button
             onClick={handleClose}
             className="
               w-10 h-10 rounded-xl
-              bg-[#F8F9FA] hover:bg-red-50
-              border border-[#E5E8EB]
+              bg-background hover:bg-red-500/200/10
+              border border-border
               flex items-center justify-center
               transition-all duration-300
               group
             "
           >
-            <X className="w-5 h-5 text-[#666666] group-hover:text-red-500" />
+            <X className="w-5 h-5 text-muted-foreground group-hover:text-red-500" />
           </button>
         </header>
 
@@ -410,7 +408,7 @@ export default function ExercisePlayerPage() {
                 transition={{ type: 'spring', delay: 0.1 }}
                 className="
                   w-28 h-28 rounded-2xl mx-auto mb-6
-                  bg-[#1428A0]
+                  bg-card
                   flex items-center justify-center
                   shadow-lg shadow-[#1428A0]/20
                 "
@@ -423,10 +421,10 @@ export default function ExercisePlayerPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
               >
-                <h2 className="text-2xl font-bold text-[#1A1A1A] mb-2">
+                <h2 className="text-2xl font-bold text-foreground mb-2">
                   수고하셨어요!
                 </h2>
-                <p className="text-[#666666] mb-8">
+                <p className="text-muted-foreground mb-8">
                   {exercise.name} {exercise.sets}세트를 모두 완료했어요
                 </p>
               </motion.div>
@@ -443,7 +441,7 @@ export default function ExercisePlayerPage() {
                     className="
                       w-full h-14
                       flex items-center justify-center gap-2
-                      bg-[#1428A0] hover:bg-[#0D1B6B]
+                      bg-card hover:bg-card
                       text-white font-semibold
                       rounded-xl
                       shadow-sm hover:shadow-md
@@ -460,7 +458,7 @@ export default function ExercisePlayerPage() {
                     className="
                       w-full h-14
                       flex items-center justify-center gap-2
-                      bg-[#1428A0] hover:bg-[#0D1B6B]
+                      bg-card hover:bg-card
                       text-white font-semibold
                       rounded-xl
                       shadow-sm hover:shadow-md
@@ -478,9 +476,9 @@ export default function ExercisePlayerPage() {
                   className="
                     w-full h-12
                     flex items-center justify-center
-                    bg-white hover:bg-[#F8F9FA]
-                    border border-[#E5E8EB] hover:border-[#1428A0]
-                    text-[#1A1A1A] font-semibold
+                    bg-card hover:bg-background
+                    border border-border hover:border-border
+                    text-foreground font-semibold
                     rounded-xl
                     transition-all duration-300
                   "
@@ -507,7 +505,7 @@ export default function ExercisePlayerPage() {
                   <span className="
                     inline-flex items-center gap-2
                     px-4 py-2 rounded-xl
-                    bg-amber-100 text-amber-700
+                    bg-amber-500/20 text-amber-700
                     text-sm font-semibold
                   ">
                     <Timer className="w-4 h-4" />
@@ -535,27 +533,27 @@ export default function ExercisePlayerPage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="
-                    bg-white rounded-2xl p-5
-                    border border-[#E5E8EB]
+                    bg-card rounded-2xl p-5
+                    border border-border
                     shadow-sm
                     max-w-sm mx-auto
                     text-left
                   "
                 >
-                  <div className="flex items-center gap-2 text-[#1428A0] text-sm font-semibold mb-2">
+                  <div className="flex items-center gap-2 text-foreground text-sm font-semibold mb-2">
                     <Info className="w-4 h-4" />
                     운동 가이드
                   </div>
-                  <p className="text-sm text-[#666666] leading-relaxed">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     {exercise.description}
                   </p>
 
-                  <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[#E5E8EB]">
-                    <span className="flex items-center gap-1.5 text-xs text-[#999999]">
+                  <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border">
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Timer className="w-3.5 h-3.5" />
                       {exercise.duration}초 × {exercise.sets}세트
                     </span>
-                    <span className="flex items-center gap-1.5 text-xs text-[#999999]">
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Flame className="w-3.5 h-3.5" />
                       {exercise.category === 'stretching' ? '스트레칭' :
                        exercise.category === 'strengthening' ? '근력 강화' : '가동성'}
@@ -572,7 +570,7 @@ export default function ExercisePlayerPage() {
           하단 컨트롤 바 - 삼성 스타일
           ============================================================ */}
       {state !== 'completed' && (
-        <div className="bg-white px-5 py-6 border-t border-[#E5E8EB]">
+        <div className="bg-card px-5 py-6 border-t border-border">
           <div className="flex items-center justify-center gap-6">
             <motion.button
               onClick={handleSkip}
@@ -580,13 +578,13 @@ export default function ExercisePlayerPage() {
               whileTap={{ scale: 0.95 }}
               className="
                 w-14 h-14 rounded-2xl
-                bg-[#F8F9FA] hover:bg-[#F0F2F5]
-                border border-[#E5E8EB]
+                bg-background hover:bg-accent
+                border border-border
                 flex items-center justify-center
                 transition-all duration-300
               "
             >
-              <SkipForward className="w-6 h-6 text-[#666666]" />
+              <SkipForward className="w-6 h-6 text-muted-foreground" />
             </motion.button>
 
             <motion.button
@@ -598,8 +596,8 @@ export default function ExercisePlayerPage() {
                 flex items-center justify-center
                 shadow-lg transition-all duration-300
                 ${state === 'resting'
-                  ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30'
-                  : 'bg-[#1428A0] hover:bg-[#0D1B6B] shadow-[#1428A0]/30'
+                  ? 'bg-amber-500/100 hover:bg-amber-600 shadow-amber-500/30'
+                  : 'bg-card hover:bg-card shadow-[#1428A0]/30'
                 }
               `}
             >
@@ -619,7 +617,7 @@ export default function ExercisePlayerPage() {
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 5 }}
-                className="text-center text-[#999999] text-sm mt-4"
+                className="text-center text-muted-foreground text-sm mt-4"
               >
                 일시정지됨 - 재생 버튼을 눌러 계속하세요
               </motion.p>
@@ -628,6 +626,6 @@ export default function ExercisePlayerPage() {
         </div>
       )}
       </div>
-    </>
+    </SidebarLayout>
   );
 }

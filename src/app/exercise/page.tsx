@@ -26,7 +26,8 @@ import {
   calculateTotalDuration,
 } from '@/constants/exercises';
 import { COUNTABLE_EXERCISES, TIMER_EXERCISES, type CountableExercise, type TimerExercise as TimerExerciseType } from '@/lib/exerciseData';
-import AppHeader from '@/components/layout/AppHeader';
+// AppHeader는 SidebarLayout에서 처리됨
+import SidebarLayout from '@/components/layout/SidebarLayout';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getLatestAnalysisResult, type AnalysisResultRow } from '@/lib/supabase';
 import { LOWER_BODY_ANALYSIS_ENABLED } from '@/constants/features';
@@ -124,7 +125,7 @@ function RealtimeExerciseCard({ exercise }: RealtimeExerciseCardProps) {
                     </span>
                   </div>
                 </div>
-                <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 group-hover:bg-green-200 dark:group-hover:bg-green-800/50 flex items-center justify-center flex-shrink-0 ml-3 transition-colors">
+                <div className="w-8 h-8 rounded-lg bg-green-500/20 dark:bg-green-900/30 group-hover:bg-green-200 dark:group-hover:bg-green-800/50 flex items-center justify-center flex-shrink-0 ml-3 transition-colors">
                   <ChevronRight className="w-5 h-5 text-green-600" />
                 </div>
               </div>
@@ -252,7 +253,7 @@ function NoAnalysisView() {
       {/* 실시간 분석 운동 섹션 */}
       <motion.div variants={itemVariants} className="mt-8">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-green-500/20 dark:bg-green-900/30 flex items-center justify-center">
             <Camera className="w-4 h-4 text-green-600" />
           </div>
           <div>
@@ -273,7 +274,7 @@ function NoAnalysisView() {
       {/* 추가 운동 섹션 */}
       <motion.div variants={itemVariants} className="mt-8">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-orange-500/20 dark:bg-orange-900/30 flex items-center justify-center">
             <Dumbbell className="w-4 h-4 text-orange-600" />
           </div>
           <div>
@@ -294,7 +295,7 @@ function NoAnalysisView() {
       <motion.div variants={itemVariants} className="mt-6 space-y-3">
         <Card>
           <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
               <TrendingUp className="w-6 h-6 text-green-600" />
             </div>
             <div>
@@ -318,7 +319,7 @@ function NoAnalysisView() {
 
         <Card>
           <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
               <Zap className="w-6 h-6 text-amber-600" />
             </div>
             <div>
@@ -434,31 +435,31 @@ function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
 
         {/* 프로그램 헤더 카드 */}
         <motion.section variants={itemVariants} className="mb-6">
-          <Card className="bg-primary text-primary-foreground border-0 overflow-hidden">
-            <CardContent className="p-6 relative">
-              <div className="absolute -right-16 -top-16 w-48 h-48 bg-primary-foreground/10 rounded-full blur-3xl" />
-
-              <div className="relative z-10">
-                <div className="w-12 h-12 rounded-xl bg-primary-foreground/20 flex items-center justify-center mb-4">
-                  <Dumbbell className="w-6 h-6" />
+          <Card className="border-border">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Dumbbell className="w-6 h-6 text-primary" />
                 </div>
 
-                <h2 className="text-xl font-bold mb-2">{program.name}</h2>
-                <p className="text-primary-foreground/80 text-sm mb-4">{program.description}</p>
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold mb-2">{program.name}</h2>
+                  <p className="text-muted-foreground text-sm mb-4">{program.description}</p>
 
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground border-0">
-                    <Target className="w-3 h-3 mr-1" />
-                    {programExercises.length}개 운동
-                  </Badge>
-                  <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground border-0">
-                    <Clock className="w-3 h-3 mr-1" />
-                    약 {totalMinutes}분
-                  </Badge>
-                  <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground border-0">
-                    <Zap className="w-3 h-3 mr-1" />
-                    {program.level}
-                  </Badge>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="secondary">
+                      <Target className="w-3 h-3 mr-1" />
+                      {programExercises.length}개 운동
+                    </Badge>
+                    <Badge variant="secondary">
+                      <Clock className="w-3 h-3 mr-1" />
+                      약 {totalMinutes}분
+                    </Badge>
+                    <Badge variant="secondary">
+                      <Zap className="w-3 h-3 mr-1" />
+                      {program.level}
+                    </Badge>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -480,7 +481,18 @@ function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
           </div>
 
           <div className="space-y-3">
-            {TIMER_EXERCISES.map((exercise) => (
+            {TIMER_EXERCISES
+              .filter((exercise) => {
+                // 분석 결과에 맞는 운동만 표시
+                if (primaryIssue === 'forward_head') {
+                  return exercise.targetDisease === '거북목';
+                }
+                if (primaryIssue === 'shoulder_tilt') {
+                  return exercise.targetDisease === '라운드숄더';
+                }
+                return true; // 기타 경우 모두 표시
+              })
+              .map((exercise) => (
               <TimerExerciseCard key={exercise.id} exercise={exercise} />
             ))}
           </div>
@@ -490,7 +502,7 @@ function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
         <motion.section variants={itemVariants} className="mt-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-green-500/20 dark:bg-green-900/30 flex items-center justify-center">
                 <Camera className="w-4 h-4 text-green-600" />
               </div>
               <div>
@@ -502,18 +514,27 @@ function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
 
           <div className="space-y-3">
             {COUNTABLE_EXERCISES
-              .filter((ex) => ['neck-side-stretch', 'shoulder-squeeze', 'arm-raise'].includes(ex.id))
+              .filter((exercise) => {
+                // 분석 결과에 맞는 운동만 표시
+                if (primaryIssue === 'forward_head') {
+                  return exercise.targetDisease === '거북목';
+                }
+                if (primaryIssue === 'shoulder_tilt') {
+                  return exercise.targetDisease === '라운드숄더' || exercise.targetDisease === '어깨 가동성';
+                }
+                return false;
+              })
               .map((exercise) => (
                 <RealtimeExerciseCard key={exercise.id} exercise={exercise} />
               ))}
           </div>
         </motion.section>
 
-        {/* 추가 운동 섹션 */}
+        {/* 추가 운동 섹션 (스쿼트) */}
         <motion.section variants={itemVariants} className="mt-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-orange-500/20 dark:bg-orange-900/30 flex items-center justify-center">
                 <Dumbbell className="w-4 h-4 text-orange-600" />
               </div>
               <div>
@@ -525,7 +546,7 @@ function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
 
           <div className="space-y-3">
             {COUNTABLE_EXERCISES
-              .filter((ex) => ex.id === 'squat')
+              .filter((exercise) => exercise.id === 'squat')
               .map((exercise) => (
                 <RealtimeExerciseCard key={exercise.id} exercise={exercise} />
               ))}
@@ -534,10 +555,10 @@ function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
 
         {/* 팁 카드 */}
         <motion.section variants={itemVariants} className="mt-6 mb-24">
-          <Card className="bg-primary/5 border-primary/20">
+          <Card>
             <CardContent className="p-4">
-              <p className="text-sm text-foreground">
-                <strong className="text-primary">오늘의 팁</strong>
+              <p className="text-sm text-muted-foreground">
+                <strong className="text-foreground">오늘의 팁</strong>
                 <span className="mx-2">|</span>
                 운동 중 통증이 느껴지면 즉시 중단하고 휴식을 취하세요.
               </p>
@@ -547,10 +568,10 @@ function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
       </motion.div>
 
       {/* 하단 시작 버튼 */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t border-border">
         <button
           onClick={handleStartExercise}
-          className="w-full h-12 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+          className="w-full h-12 bg-blue-500/100 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
         >
           <Play className="w-5 h-5 fill-current" />
           운동 시작하기
@@ -611,18 +632,16 @@ export default function ExercisePage() {
   }, [user]);
 
   return (
-    <>
-      <AppHeader />
-
-      <div className="min-h-screen bg-slate-50 pb-24 pt-14">
+    <SidebarLayout>
+      <div className="min-h-screen bg-background pb-24">
         {/* 페이지 헤더 */}
         <motion.div
-          className="bg-white px-5 py-6 border-b border-gray-100"
+          className="bg-card px-5 py-6 border-b border-border"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-xl font-semibold text-gray-800">맞춤 운동</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-xl font-semibold text-foreground">맞춤 운동</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             AI 분석 결과에 맞는 운동을 추천해드려요
           </p>
         </motion.div>
@@ -638,6 +657,6 @@ export default function ExercisePage() {
           <NoAnalysisView />
         )}
       </div>
-    </>
+    </SidebarLayout>
   );
 }

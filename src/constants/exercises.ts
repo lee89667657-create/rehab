@@ -44,10 +44,11 @@ export interface ExerciseData {
    * 타겟 조건 (어떤 자세 문제를 개선하는가)
    * - forward_head: 거북목
    * - round_shoulder: 라운드숄더
+   * - kyphosis: 등굽음
    * - pelvis_tilt: 골반 틀어짐 (추후 활성화)
    * - knee_alignment: 무릎 정렬 (추후 활성화)
    */
-  targetCondition: 'forward_head' | 'round_shoulder' | 'pelvis_tilt' | 'knee_alignment';
+  targetCondition: 'forward_head' | 'round_shoulder' | 'kyphosis' | 'pelvis_tilt' | 'knee_alignment';
 
   /** 1세트 수행 시간 (초) */
   duration: number;
@@ -184,6 +185,49 @@ export const exercises: ExerciseData[] = [
   },
 
   // ========================================
+  // 등굽음(Kyphosis) 개선 운동
+  // ========================================
+  {
+    id: 'clasped-hands-back-stretch',
+    name: '손깍지 뒤로 펴기',
+    nameEn: 'Clasped Hands Back Stretch',
+    category: 'stretching',
+    targetCondition: 'kyphosis',
+    duration: 25,
+    sets: 3,
+    description: '등 뒤에서 손깍지를 끼고 가슴을 열어 등굽음을 교정합니다',
+    instructions: [
+      '바르게 서서 양손을 등 뒤로 가져갑니다',
+      '손깍지를 끼고 팔을 쭉 펴줍니다',
+      '가슴을 앞으로 내밀며 어깨를 뒤로 젖힙니다',
+      '깍지 낀 손을 천천히 위로 들어올립니다',
+      '5초간 유지 후 천천히 내립니다',
+    ],
+    difficulty: 1,
+    restTime: 15,
+  },
+  {
+    id: 'ytw-exercise',
+    name: 'Y-T-W 운동',
+    nameEn: 'Y-T-W Exercise',
+    category: 'strengthening',
+    targetCondition: 'kyphosis',
+    duration: 30,
+    sets: 3,
+    description: 'Y, T, W 세 가지 자세로 등 근육을 강화합니다',
+    instructions: [
+      'Y 자세: 양팔을 위로 45도 각도로 들어 Y 모양을 만듭니다',
+      '3초간 유지하며 등 근육에 힘을 줍니다',
+      'T 자세: 양팔을 수평으로 펴서 T 모양을 만듭니다',
+      '3초간 유지하며 견갑골을 조입니다',
+      'W 자세: 팔꿈치를 90도로 굽혀 W 모양을 만듭니다',
+      '3초간 유지 후 처음부터 반복합니다',
+    ],
+    difficulty: 1,
+    restTime: 20,
+  },
+
+  // ========================================
   // [하체 분석 - 추후 활성화 예정]
   // 골반 틀어짐(Pelvis Tilt) 개선 운동
   // features.ts의 LOWER_BODY_ANALYSIS_ENABLED로 제어
@@ -288,6 +332,15 @@ const allExercisePrograms: ExerciseProgram[] = [
     description: '가슴과 등 근육의 균형을 맞춥니다',
     targetCondition: 'round_shoulder',
     exerciseIds: ['doorway-stretch', 'shoulder-blade-squeeze'],
+    estimatedMinutes: 10,
+    level: '초급',
+  },
+  {
+    id: 'kyphosis-program',
+    name: '등굽음 개선 프로그램',
+    description: '굽은 등을 펴고 등 근육을 강화합니다',
+    targetCondition: 'kyphosis',
+    exerciseIds: ['clasped-hands-back-stretch', 'ytw-exercise'],
     estimatedMinutes: 10,
     level: '초급',
   },

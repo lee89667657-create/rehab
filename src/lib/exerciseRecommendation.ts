@@ -52,9 +52,9 @@ export interface ExerciseRecommendation {
 // ============================================================
 
 /**
- * 구현된 운동 목록 (6개):
- * - 타이머 운동: chin-tuck, shoulder-blade-squeeze
- * - 실시간 분석: neck-side-stretch, shoulder-squeeze, arm-raise, squat
+ * 구현된 운동 목록 (8개):
+ * - 타이머 운동: chin-tuck, shoulder-blade-squeeze, clasped-hands-back-stretch
+ * - 실시간 분석: neck-side-stretch, shoulder-squeeze, arm-raise, squat, ytw-exercise
  */
 const EXERCISE_PROGRAMS: ExerciseProgram[] = [
   // 거북목 개선 프로그램
@@ -105,20 +105,38 @@ const EXERCISE_PROGRAMS: ExerciseProgram[] = [
     precautions: ['무릎이 발끝을 넘지 않게', '허리는 곧게 유지'],
   },
 
+  // 등굽음 개선 프로그램
+  {
+    id: 'kyphosis_recovery',
+    name: '등굽음 개선 프로그램',
+    targetDisease: '등굽음',
+    duration: 12,
+    difficulty: 'easy',
+    frequency: '매일 1-2회',
+    exercises: [
+      { id: 'clasped-hands-back-stretch', name: '손깍지 뒤로 펴기', sets: 3, reps: '5초 유지', description: '가슴 열고 등 펴기 (타이머)' },
+      { id: 'ytw-exercise', name: 'Y-T-W 운동', sets: 3, reps: 5, description: 'Y→T→W 자세 전환 (실시간 분석)' },
+    ],
+    benefits: ['등 유연성 향상', '등 근육 강화', '자세 개선'],
+    precautions: ['무리하게 젖히지 않기', '통증 시 중단'],
+  },
+
   // 전신 예방 프로그램 (일일 루틴용)
   {
     id: 'daily_posture',
     name: '일일 자세 교정',
     targetDisease: '전신 예방',
-    duration: 15,
+    duration: 20,
     difficulty: 'easy',
     frequency: '매일',
     exercises: [
       { id: 'chin-tuck', name: '턱 당기기', sets: 3, reps: '10초 유지', description: '이중턱 만들기 (타이머)' },
       { id: 'shoulder-blade-squeeze', name: '견갑골 모으기', sets: 3, reps: '5초 유지', description: '견갑골 모으기 (타이머)' },
+      { id: 'clasped-hands-back-stretch', name: '손깍지 뒤로 펴기', sets: 3, reps: '5초 유지', description: '가슴 열고 등 펴기 (타이머)' },
       { id: 'neck-side-stretch', name: '목 옆 스트레칭', sets: 2, reps: 8, description: '거북목 교정 (실시간 분석)' },
       { id: 'shoulder-squeeze', name: '어깨 으쓱하기', sets: 3, reps: 12, description: '어깨 으쓱하기 (실시간 분석)' },
       { id: 'arm-raise', name: '팔 들어올리기', sets: 2, reps: 10, description: '팔 들어올리기 (실시간 분석)' },
+      { id: 'ytw-exercise', name: 'Y-T-W 운동', sets: 3, reps: 5, description: 'Y→T→W 자세 전환 (실시간 분석)' },
       { id: 'squat', name: '스쿼트', sets: 3, reps: 10, description: '스쿼트 (실시간 분석)' },
     ],
     benefits: ['자세 개선', '전신 근력 유지', '일상 피로 해소'],
@@ -136,6 +154,7 @@ const EXERCISE_PROGRAMS: ExerciseProgram[] = [
  * 현재 분석 질환:
  * - forward_head (거북목 증후군) → 거북목 개선 프로그램
  * - round_shoulder (라운드숄더) → 라운드숄더 개선 프로그램
+ * - kyphosis (등굽음) → 등굽음 개선 프로그램
  */
 function findProgramsForDisease(diseaseId: string): ExerciseProgram[] {
   const diseaseMap: Record<string, string> = {
@@ -144,6 +163,9 @@ function findProgramsForDisease(diseaseId: string): ExerciseProgram[] {
 
     // 라운드숄더
     round_shoulder: '라운드숄더',
+
+    // 등굽음
+    kyphosis: '등굽음',
   };
 
   const targetDisease = diseaseMap[diseaseId];

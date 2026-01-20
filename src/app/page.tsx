@@ -3,7 +3,7 @@
  *
  * / 경로
  * - 비로그인: LandingPage (서비스 소개)
- * - 로그인: Dashboard (대시보드)
+ * - 로그인: Dashboard + Sidebar (대시보드)
  */
 
 'use client';
@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import LandingPage from '@/components/landing/LandingPage';
 import Dashboard from '@/components/home/Dashboard';
+import Sidebar from '@/components/layout/Sidebar';
 
 export default function HomePage() {
   // undefined = 로딩중, null = 비로그인, User = 로그인됨
@@ -42,8 +43,8 @@ export default function HomePage() {
   // 로딩 중 (undefined)
   if (user === undefined) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA]">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#1428A0]" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
       </div>
     );
   }
@@ -53,6 +54,13 @@ export default function HomePage() {
     return <LandingPage />;
   }
 
-  // 로그인됨 → 대시보드
-  return <Dashboard />;
+  // 로그인됨 → 사이드바 + 대시보드
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <main className="flex-1 ml-56">
+        <Dashboard />
+      </main>
+    </div>
+  );
 }

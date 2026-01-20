@@ -217,6 +217,53 @@ export const calculateShoulderAngle = (landmarks: Point3D[], side: 'left' | 'rig
   return calculateAngle3D(hip, shoulder, elbow);
 };
 
+/**
+ * 목 전방 각도 계산 (거북목 측정용)
+ *
+ * 귀와 어깨를 연결한 선이 수직선과 이루는 각도를 계산합니다.
+ * 정상적인 자세에서는 0도에 가깝고,
+ * 머리가 앞으로 나올수록 각도가 커집니다.
+ *
+ * 측정 원리:
+ * 1. 귀(ear)와 어깨(shoulder) 좌표를 사용
+ * 2. 귀가 어깨보다 앞에 있으면 양수 각도
+ * 3. 15도 이상이면 거북목 의심
+ *
+ * @param landmarks - 3D 좌표 배열 (33개)
+ * @returns 목 전방 각도 (도 단위, 0 = 정상, 양수 = 앞으로 나옴)
+ */
+export const calculateNeckAngle = (landmarks: Point3D[]): number => {
+  // 양쪽 귀와 어깨 좌표 가져오기
+  const leftEar = getLandmark(landmarks, LANDMARK_INDEX.LEFT_EAR);
+  const rightEar = getLandmark(landmarks, LANDMARK_INDEX.RIGHT_EAR);
+  const leftShoulder = getLandmark(landmarks, LANDMARK_INDEX.LEFT_SHOULDER);
+  const rightShoulder = getLandmark(landmarks, LANDMARK_INDEX.RIGHT_SHOULDER);
+
+  // 관절이 하나라도 없으면 계산 불가
+  if (!leftEar || !rightEar || !leftShoulder || !rightShoulder) {
+    return 0;
+  }
+
+  // 귀 중점과 어깨 중점 계산
+  const earMid = getMidpoint(leftEar, rightEar);
+  const shoulderMid = getMidpoint(leftShoulder, rightShoulder);
+
+  // 전방 방향 변위 (z축 - 앞뒤 방향)
+  // MediaPipe에서 z축은 카메라 방향이 음수
+  // 귀가 어깨보다 앞에 있으면 dz가 음수
+  const dz = earMid.z - shoulderMid.z;
+
+  // 수직 방향 변위 (y축)
+  const dy = earMid.y - shoulderMid.y;
+
+  // atan2로 각도 계산 (라디안 -> 도 변환)
+  // dz가 음수면(앞으로 나옴) 양수 각도 반환
+  const angle = Math.atan2(-dz, -dy) * (180 / Math.PI);
+
+  // 소수점 1자리까지 반올림
+  return Math.round(Math.abs(angle) * 10) / 10;
+};
+
 // ============================================================
 // 통합 계산 함수
 // ============================================================
@@ -234,6 +281,9 @@ export const calculateAllJointAngles = (landmarks: Point3D[]): JointAngles => {
   return {
     // 몸통 기울기
     trunk: calculateTrunkAngle(landmarks),
+
+    // 목 전방 각도 (거북목)
+    neck: calculateNeckAngle(landmarks),
 
     // 고관절 각도 (좌/우)
     hipLeft: calculateHipAngle(landmarks, 'left'),

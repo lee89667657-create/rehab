@@ -74,11 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
 
-        if (event === 'SIGNED_IN') {
-          // 로그인 성공 시 대시보드로 이동
-          router.push('/dashboard');
-        } else if (event === 'SIGNED_OUT') {
-          // 로그아웃 시 홈(랜딩 페이지)으로 이동
+        // 로그아웃 시에만 홈으로 이동
+        // SIGNED_IN은 탭 전환/새로고침 시에도 발생하므로 리다이렉트 하지 않음
+        if (event === 'SIGNED_OUT') {
           router.push('/');
         }
       }
@@ -111,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       router.push('/');
     } else if (user && shouldRedirectToDashboard) {
       // 로그인 사용자가 로그인/회원가입 페이지 접근 시 → /dashboard로 리다이렉트
-      router.push('/dashboard');
+      router.push('/');
     }
   }, [user, isLoading, pathname, router, isMounted]);
 
@@ -145,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 로딩 중 또는 마운트 전 스켈레톤 UI 표시
   if (!isMounted || isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-muted">
         {/* 상단 헤더 스켈레톤 */}
         <div className="p-5 space-y-6">
           <div className="flex items-center justify-between">

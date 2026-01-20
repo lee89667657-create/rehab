@@ -137,7 +137,7 @@ export default function DynamicSkeleton({
         style={{ width, height }}
       >
         {/* 중앙에 안내 메시지 */}
-        <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-xs">
+        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs">
           데이터 없음
         </div>
       </div>

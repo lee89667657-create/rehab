@@ -580,7 +580,7 @@ export default function AnalyzePage() {
       {/* 앱 공통 헤더 - 로고 + 앱 이름 */}
       <AppHeader />
 
-      <div className="fixed inset-0 pt-14 bg-[#1A1A1A] flex items-center justify-center">
+      <div className="fixed inset-0 pt-14 bg-card flex items-center justify-center">
         {/* 세로 카메라 컨테이너 */}
         <div className="
           relative
@@ -591,8 +591,8 @@ export default function AnalyzePage() {
           md:rounded-2xl
           md:overflow-hidden
           md:shadow-2xl
-          md:border md:border-[#E5E8EB]/10
-          bg-[#1A1A1A]
+          md:border md:border-border/10
+          bg-card
         ">
         {/* ============================================================
             상단 헤더
@@ -609,7 +609,7 @@ export default function AnalyzePage() {
                 w-10 h-10
                 flex items-center justify-center
                 rounded-xl
-                bg-white/10
+                bg-card/10
                 backdrop-blur-md
                 border border-white/10
                 transition-all duration-300
@@ -626,7 +626,7 @@ export default function AnalyzePage() {
               className="
                 px-4 py-2
                 rounded-xl
-                bg-blue-500
+                bg-blue-500/100
                 shadow-lg shadow-blue-500/30
               "
             >
@@ -640,7 +640,7 @@ export default function AnalyzePage() {
               w-10 h-10
               flex items-center justify-center
               rounded-xl
-              bg-white/10
+              bg-card/10
               backdrop-blur-md
               border border-white/10
             ">
@@ -701,7 +701,7 @@ export default function AnalyzePage() {
                 exit={{ opacity: 0, y: -10 }}
                 className="absolute top-1/4 left-1/2 -translate-x-1/2 z-20"
               >
-                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 text-white font-semibold text-sm shadow-lg">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/100 text-white font-semibold text-sm shadow-lg">
                   <CheckCircle className="w-5 h-5" />
                   좋아요! 촬영 준비 완료
                 </div>
@@ -731,7 +731,7 @@ export default function AnalyzePage() {
                 transition={{ duration: 0.25 }}
                 className="relative"
               >
-                <div className="w-28 h-28 rounded-2xl bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <div className="w-28 h-28 rounded-2xl bg-blue-500/100 flex items-center justify-center shadow-lg shadow-blue-500/30">
                   <span className="text-6xl font-bold text-white">
                     {countdown}
                   </span>
@@ -754,7 +754,7 @@ export default function AnalyzePage() {
         <AnimatePresence>
           {countdown === 0 && (
             <motion.div
-              className="absolute inset-0 bg-white z-40"
+              className="absolute inset-0 bg-card z-40"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -769,7 +769,7 @@ export default function AnalyzePage() {
         <AnimatePresence>
           {isAnalyzing && (
             <motion.div
-              className="absolute inset-0 flex items-center justify-center bg-[#1A1A1A]/90 backdrop-blur-sm z-50"
+              className="absolute inset-0 flex items-center justify-center bg-card/90 backdrop-blur-sm z-50"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -810,10 +810,10 @@ export default function AnalyzePage() {
                       relative px-5 py-2.5 rounded-xl text-sm font-semibold
                       transition-all duration-300
                       ${isActive
-                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                        ? 'bg-blue-500/100 text-white shadow-lg shadow-blue-500/30'
                         : isCaptured
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-white/10 text-white/70 border border-white/10'
+                          ? 'bg-emerald-500/100/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-card/10 text-white/70 border border-white/10'
                       }
                       ${countdown !== null ? 'opacity-50' : ''}
                     `}
@@ -848,7 +848,7 @@ export default function AnalyzePage() {
                   absolute inset-2 rounded-xl
                   flex items-center justify-center
                   shadow-lg transition-colors duration-300
-                  ${isFullBodyVisible ? 'bg-emerald-500' : 'bg-white/50'}
+                  ${isFullBodyVisible ? 'bg-emerald-500/100' : 'bg-card/50'}
                 `}>
                   <Camera className={`w-7 h-7 transition-colors duration-300 ${isFullBodyVisible ? 'text-white' : 'text-white/70'}`} />
                 </div>
@@ -880,8 +880,8 @@ export default function AnalyzePage() {
                       ${isCaptured
                         ? 'bg-emerald-400'
                         : isActive
-                          ? 'bg-blue-500'
-                          : 'bg-white/30'
+                          ? 'bg-blue-500/100'
+                          : 'bg-card/30'
                       }
                     `}
                   />
@@ -895,10 +895,10 @@ export default function AnalyzePage() {
                 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold
                 border transition-all duration-300
                 ${isFullBodyVisible
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  ? 'bg-emerald-500/100/10 text-emerald-400 border-emerald-500/20'
                   : currentLandmarks
-                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                    : 'bg-red-500/10 text-red-400 border-red-500/20'
+                    ? 'bg-amber-500/100/10 text-amber-400 border-amber-500/20'
+                    : 'bg-red-500/100/10 text-red-400 border-red-500/20'
                 }
               `}>
                 <div className={`

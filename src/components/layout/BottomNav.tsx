@@ -27,7 +27,7 @@ interface NavItem {
 
 // 네비게이션 아이템 목록
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: '홈', icon: Home },
+  { href: '/', label: '홈', icon: Home },
   { href: '/analyze', label: '분석', icon: Camera },
   { href: '/exercise', label: '운동', icon: Dumbbell },
   { href: '/history', label: '기록', icon: History },
@@ -39,8 +39,8 @@ export default function BottomNav() {
 
   // 현재 경로가 네비게이션 아이템과 일치하는지 확인
   const isActive = (href: string) => {
-    if (href === '/dashboard') {
-      return pathname === '/dashboard';
+    if (href === '/') {
+      return pathname === '/';
     }
     return pathname.startsWith(href);
   };

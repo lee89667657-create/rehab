@@ -81,7 +81,7 @@ export default function Header({
         h-14
         flex items-center justify-between
         px-4
-        bg-white
+        bg-card
         border-b border-zinc-200
       "
     >

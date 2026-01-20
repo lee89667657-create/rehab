@@ -110,6 +110,34 @@ export interface CountableExercise {
   mirrorMode?: boolean;
 
   /**
+   * 카메라 촬영 방향
+   * - 'front': 정면 촬영 (기본값)
+   * - 'side': 측면 촬영
+   */
+  cameraDirection?: 'front' | 'side';
+
+  /**
+   * 분석 방식
+   * - 'position': 좌표 변화량 기반 (기본값)
+   * - 'angle': 관절 각도 기반
+   */
+  analysisType?: 'position' | 'angle';
+
+  /**
+   * 각도 분석 설정 (analysisType이 'angle'일 때)
+   * - joint1, joint2, joint3: 각도를 측정할 3개 관절
+   * - startAngle: 시작 자세 각도
+   * - targetAngle: 목표 자세 각도
+   */
+  angleConfig?: {
+    joint1: string;  // 첫 번째 관절 (예: 'hip')
+    joint2: string;  // 중심 관절 (예: 'knee') - 각도 측정 기준점
+    joint3: string;  // 세 번째 관절 (예: 'ankle')
+    startAngle: number;   // 시작 자세 각도 (예: 170)
+    targetAngle: number;  // 목표 자세 각도 (예: 90)
+  };
+
+  /**
    * 캘리브레이션 기반 동작 감지용 변화량 임계값
    * baseline 대비 이 값 이상 변화해야 동작으로 인식
    * 기본값: 0.05 (5%)
@@ -153,6 +181,48 @@ export interface TimerExercise {
 
   /** 자세 포인트 (사용자에게 표시할 주의사항) */
   keyPoints: string[];
+}
+
+/**
+ * 시퀀스 운동의 자세 조건
+ */
+export interface PoseCondition {
+  joint: 'wrist' | 'elbow' | 'shoulder' | 'nose';
+  axis: 'x' | 'y';
+  compare: 'above' | 'below' | 'between';
+  threshold: number | [number, number];
+  relativeTo?: {
+    joint: 'wrist' | 'elbow' | 'shoulder' | 'hip';
+    axis: 'x' | 'y';
+    compare: 'above' | 'below';
+  };
+}
+
+/**
+ * 시퀀스 운동의 자세 정의
+ */
+export interface PoseDefinition {
+  name: string;
+  description: string;
+  holdTime: number;
+  conditions: PoseCondition[];
+}
+
+/**
+ * 시퀀스 운동 타입 (Y-T-W 같은 연속 자세 운동)
+ */
+export interface SequenceExercise {
+  id: string;
+  name: string;
+  description: string;
+  targetDisease: string;
+  sets: number;
+  cycles: number;
+  restTime: number;
+  keyPoints: string[];
+  cameraDirection: 'front' | 'side';
+  poses: PoseDefinition[];
+  transitionTime?: number;
 }
 
 /**
@@ -235,6 +305,36 @@ export const TIMER_EXERCISES: TimerExercise[] = [
     restTime: 5,   // 세트 간 5초 휴식
     keyPoints: ['등 중앙에 연필을 끼운다는 느낌', '어깨는 내리고', '5초간 유지', '천천히 이완'],
   },
+  {
+    id: 'clasped-hands-back-stretch',
+    name: '손깍지 뒤로 펴기',
+    description: '등 뒤에서 손깍지를 끼고 팔을 펴서 가슴을 열어주세요',
+    targetDisease: '등굽음',
+    sets: 3,
+    holdTime: 5,
+    restTime: 10,
+    keyPoints: [
+      '바르게 서서 양손을 등 뒤로',
+      '손깍지를 끼고 팔을 쭉 펴기',
+      '가슴을 앞으로 내밀기',
+      '5초간 유지 후 천천히 이완',
+    ],
+  },
+  {
+    id: 'ytw-exercise',
+    name: 'Y-T-W 운동',
+    description: 'Y, T, W 세 가지 자세로 등 근육을 강화합니다. 화면 안내에 따라 자세를 바꿔주세요.',
+    targetDisease: '등굽음',
+    sets: 3,
+    holdTime: 9,  // Y(3초) + T(3초) + W(3초) = 9초
+    restTime: 15,
+    keyPoints: [
+      'Y: 양팔을 위로 45도 벌려 Y 모양 (3초)',
+      'T: 양팔을 수평으로 펴서 T 모양 (3초)',
+      'W: 팔꿈치를 90도로 굽혀 W 모양 (3초)',
+      '화면 안내에 따라 천천히 자세를 바꾸세요',
+    ],
+  },
 ];
 
 // ============================================================
@@ -294,7 +394,7 @@ export const COUNTABLE_EXERCISES: CountableExercise[] = [
   {
     id: 'squat',
     name: '스쿼트',
-    description: '무릎을 굽혀 앉았다 일어나세요. 전신이 보이도록 카메라에서 떨어져주세요.',
+    description: '무릎을 굽혀 앉았다 일어나세요. 측면에서 전신이 보이도록 촬영해주세요.',
     targetDisease: '무릎/골반',
     duration: 90,
     sets: 3,
@@ -302,36 +402,26 @@ export const COUNTABLE_EXERCISES: CountableExercise[] = [
     restTime: 30,
     countingJoint: 'knee',
     countingAxis: 'y',
-    // y축 기준: 스쿼트하면 무릎 y 좌표가 작아짐 (무릎이 위로 올라감)
-    thresholdUp: 0.60,    // 선 상태 (무릎 아래쪽)
-    thresholdDown: 0.50,  // 앉은 상태 (무릎 위쪽)
-    keyPoints: ['카메라에 무릎이 보이도록', '무릎이 발끝을 넘지 않게', '허리는 곧게', '엉덩이를 뒤로'],
+    thresholdUp: 0.60,
+    thresholdDown: 0.50,
+    keyPoints: ['측면에서 촬영해주세요', '무릎이 발끝을 넘지 않게', '허리는 곧게', '엉덩이를 뒤로'],
     countingCooldown: 500,
-    deltaThreshold: 0.08,  // 8% 변화량 (큰 움직임)
+    deltaThreshold: 0.08,
     debounceFrames: 3,
-  },
-  {
-    id: 'knee-lift',
-    name: '무릎 들어올리기',
-    description: '한쪽 무릎을 가슴 쪽으로 들어올리세요',
-    targetDisease: '고관절/골반',
-    duration: 60,
-    sets: 2,
-    reps: 10,
-    restTime: 15,
-    countingJoint: 'knee',
-    countingAxis: 'y',
-    // y축 기준: 무릎을 올리면 y 좌표가 작아짐 (위로 이동)
-    thresholdUp: 0.55,    // 무릎 올린 상태
-    thresholdDown: 0.75,  // 무릎 내린 상태
-    keyPoints: ['상체 곧게 유지', '천천히 올리고 내리기', '양쪽 번갈아 실시'],
-    countingCooldown: 400,
-    deltaThreshold: 0.08,  // 8% 변화량
-    debounceFrames: 3,
+    // 측면 촬영 + 각도 분석
+    cameraDirection: 'side',
+    analysisType: 'angle',
+    angleConfig: {
+      joint1: 'hip',
+      joint2: 'knee',
+      joint3: 'ankle',
+      startAngle: 170,  // 서 있을 때
+      targetAngle: 90,  // 완전히 앉았을 때
+    },
   },
 
   // ========================================
-  // 팔 운동
+  // 어깨 가동성 운동
   // ========================================
   {
     id: 'arm-raise',
@@ -344,33 +434,31 @@ export const COUNTABLE_EXERCISES: CountableExercise[] = [
     restTime: 15,
     countingJoint: 'wrist',
     countingAxis: 'y',
-    // y축 기준: 팔을 올리면 손목 y 좌표가 작아짐 (위로 이동)
-    thresholdUp: 0.25,    // 팔 올린 상태
-    thresholdDown: 0.55,  // 팔 내린 상태
+    thresholdUp: 0.25,
+    thresholdDown: 0.55,
     keyPoints: ['팔을 곧게 펴고', '어깨 높이 이상으로', '천천히 올리고 내리기'],
     countingCooldown: 500,
-    deltaThreshold: 0.10,  // 10% 변화량 (팔 움직임 큼)
+    deltaThreshold: 0.10,
     debounceFrames: 3,
+    // 정면 촬영 + 각도 분석
+    cameraDirection: 'front',
+    analysisType: 'angle',
+    angleConfig: {
+      joint1: 'hip',
+      joint2: 'shoulder',
+      joint3: 'wrist',
+      startAngle: 20,   // 팔 내렸을 때 (몸통과 팔 사이 각도)
+      targetAngle: 170, // 팔 올렸을 때
+    },
   },
-  {
-    id: 'elbow-flex',
-    name: '팔꿈치 굽히기',
-    description: '팔꿈치를 굽혀 손을 어깨 쪽으로 가져오세요',
-    targetDisease: '팔 근력',
-    duration: 60,
-    sets: 3,
-    reps: 12,
-    restTime: 15,
-    countingJoint: 'wrist',
-    countingAxis: 'y',
-    // y축 기준: 팔꿈치를 굽히면 손목이 위로 이동
-    thresholdUp: 0.30,    // 팔꿈치 굽힌 상태
-    thresholdDown: 0.50,  // 팔 펴진 상태
-    keyPoints: ['팔꿈치는 몸에 붙이고', '손목만 올리기', '천천히 반복'],
-    countingCooldown: 400,
-    deltaThreshold: 0.08,  // 8% 변화량
-    debounceFrames: 3,
-  },
+];
+
+// ============================================================
+// 시퀀스 운동 데이터 (연속 자세 운동)
+// ============================================================
+
+export const SEQUENCE_EXERCISES: SequenceExercise[] = [
+  // 현재 시퀀스 운동 없음 (Y-T-W는 타이머 운동으로 이동)
 ];
 
 // ============================================================
@@ -392,10 +480,17 @@ export function getTimerExerciseById(id: string): TimerExercise | undefined {
 }
 
 /**
- * ID로 모든 운동에서 찾기 (카운팅 + 타이머)
+ * ID로 시퀀스 운동 찾기
  */
-export function getExerciseById(id: string): CountableExercise | TimerExercise | undefined {
-  return getCountableExerciseById(id) || getTimerExerciseById(id);
+export function getSequenceExerciseById(id: string): SequenceExercise | undefined {
+  return SEQUENCE_EXERCISES.find((ex) => ex.id === id);
+}
+
+/**
+ * ID로 모든 운동에서 찾기 (카운팅 + 타이머 + 시퀀스)
+ */
+export function getExerciseById(id: string): CountableExercise | TimerExercise | SequenceExercise | undefined {
+  return getCountableExerciseById(id) || getTimerExerciseById(id) || getSequenceExerciseById(id);
 }
 
 /**
@@ -506,6 +601,87 @@ export function getJointValue(
   }
 
   return value;
+}
+
+// ============================================================
+// 시퀀스 운동 자세 감지 함수
+// ============================================================
+
+/**
+ * 단일 자세 조건 검사
+ * @param landmarks - 랜드마크 배열
+ * @param condition - 검사할 조건
+ * @returns 조건 충족 여부
+ */
+export function checkPoseCondition(
+  landmarks: Array<{ x: number; y: number; visibility?: number }>,
+  condition: PoseCondition
+): boolean {
+  const jointIndices: Record<string, number | [number, number]> = {
+    nose: 0, shoulder: [11, 12], elbow: [13, 14], wrist: [15, 16], hip: [23, 24],
+  };
+
+  const getJointVal = (joint: string, axis: 'x' | 'y'): number | null => {
+    const idx = jointIndices[joint];
+    if (idx === undefined) return null;
+    if (typeof idx === 'number') {
+      const lm = landmarks[idx];
+      if (!lm || (lm.visibility ?? 0) < 0.5) return null;
+      return axis === 'x' ? lm.x : lm.y;
+    }
+    const [leftIdx, rightIdx] = idx;
+    const left = landmarks[leftIdx], right = landmarks[rightIdx];
+    const leftOk = left && (left.visibility ?? 0) >= 0.5;
+    const rightOk = right && (right.visibility ?? 0) >= 0.5;
+    if (leftOk && rightOk) return axis === 'x' ? (left.x + right.x) / 2 : (left.y + right.y) / 2;
+    if (leftOk) return axis === 'x' ? left.x : left.y;
+    if (rightOk) return axis === 'x' ? right.x : right.y;
+    return null;
+  };
+
+  const jointValue = getJointVal(condition.joint, condition.axis);
+  if (jointValue === null) return false;
+
+  if (condition.relativeTo) {
+    const refValue = getJointVal(condition.relativeTo.joint, condition.relativeTo.axis);
+    if (refValue === null) return false;
+    if (condition.relativeTo.compare === 'above' && jointValue >= refValue) return false;
+    if (condition.relativeTo.compare === 'below' && jointValue <= refValue) return false;
+  }
+
+  if (condition.compare === 'above') return jointValue < (condition.threshold as number);
+  if (condition.compare === 'below') return jointValue > (condition.threshold as number);
+  if (condition.compare === 'between') {
+    const [min, max] = condition.threshold as [number, number];
+    return jointValue >= min && jointValue <= max;
+  }
+  return false;
+}
+
+/**
+ * 현재 자세 감지
+ * 조건이 더 많은(더 구체적인) 자세를 먼저 체크합니다.
+ * 예: W(2개 조건)를 T(1개 조건)보다 먼저 체크
+ *
+ * @param landmarks - 랜드마크 배열
+ * @param poses - 감지할 자세 목록
+ * @returns 감지된 자세 정보 또는 null
+ */
+export function detectCurrentPose(
+  landmarks: Array<{ x: number; y: number; visibility?: number }>,
+  poses: PoseDefinition[]
+): { poseIndex: number; poseName: string } | null {
+  // 조건 개수가 많은 자세부터 체크 (더 구체적인 자세 우선)
+  const sortedIndices = poses
+    .map((pose, index) => ({ index, conditionCount: pose.conditions.length }))
+    .sort((a, b) => b.conditionCount - a.conditionCount)
+    .map((item) => item.index);
+
+  for (const i of sortedIndices) {
+    const allMet = poses[i].conditions.every((c) => checkPoseCondition(landmarks, c));
+    if (allMet) return { poseIndex: i, poseName: poses[i].name };
+  }
+  return null;
 }
 
 export default COUNTABLE_EXERCISES;

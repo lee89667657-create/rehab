@@ -182,10 +182,10 @@ interface FeedbackOverlayDisplayProps {
 
 function FeedbackOverlayDisplay({ feedback }: FeedbackOverlayDisplayProps) {
   const bgColors = {
-    success: 'bg-emerald-500',
-    warning: 'bg-amber-500',
-    error: 'bg-red-500',
-    info: 'bg-blue-500',
+    success: 'bg-emerald-500/100',
+    warning: 'bg-amber-500/100',
+    error: 'bg-red-500/100',
+    info: 'bg-blue-500/100',
   };
 
   const positionClasses = {
@@ -224,9 +224,9 @@ function AngleBadge({ angle, canvasWidth, canvasHeight }: AngleBadgeProps) {
   const y = angle.position.y * canvasHeight;
 
   const statusColors = {
-    good: 'bg-emerald-500 text-white',
-    warning: 'bg-amber-500 text-white',
-    danger: 'bg-red-500 text-white',
+    good: 'bg-emerald-500/100 text-white',
+    warning: 'bg-amber-500/100 text-white',
+    danger: 'bg-red-500/100 text-white',
   };
 
   return (

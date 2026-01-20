@@ -38,7 +38,8 @@ import {
   AreaChart,
   Area,
 } from 'recharts';
-import AppHeader from '@/components/layout/AppHeader';
+// AppHeader는 SidebarLayout에서 처리됨
+import SidebarLayout from '@/components/layout/SidebarLayout';
 import { useAuth } from '@/components/providers/AuthProvider';
 import {
   getAnalysisHistory,
@@ -285,9 +286,8 @@ export default function StatsPage() {
   // ============================================================
   if (isLoading) {
     return (
-      <>
-        <AppHeader />
-        <div className="min-h-screen bg-slate-50 pb-24 pt-14">
+      <SidebarLayout>
+        <div className="min-h-screen bg-background pb-24">
           <div className="px-5 pt-5 space-y-4">
             {[1, 2, 3, 4].map((i) => (
               <Card key={i}>
@@ -298,7 +298,7 @@ export default function StatsPage() {
             ))}
           </div>
         </div>
-      </>
+      </SidebarLayout>
     );
   }
 
@@ -307,9 +307,8 @@ export default function StatsPage() {
   // ============================================================
   if (!user || analysisRecords.length === 0) {
     return (
-      <>
-        <AppHeader />
-        <div className="min-h-screen bg-slate-50 pb-24 pt-14">
+      <SidebarLayout>
+        <div className="min-h-screen bg-background pb-24">
           <motion.div
             className="px-5 pt-5"
             variants={containerVariants}
@@ -344,7 +343,7 @@ export default function StatsPage() {
             </motion.div>
           </motion.div>
         </div>
-      </>
+      </SidebarLayout>
     );
   }
 
@@ -352,13 +351,11 @@ export default function StatsPage() {
   // 메인 렌더링
   // ============================================================
   return (
-    <>
-      <AppHeader />
-
-      <div className="min-h-screen bg-slate-50 pb-24 pt-14">
+    <SidebarLayout>
+      <div className="min-h-screen bg-background pb-24">
         {/* 페이지 헤더 */}
         <motion.div
-          className="bg-white px-5 py-6 border-b border-gray-100"
+          className="bg-card px-5 py-6 border-b border-border"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -371,9 +368,9 @@ export default function StatsPage() {
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <h1 className="text-xl font-semibold text-gray-800">통계</h1>
+            <h1 className="text-xl font-semibold text-foreground">통계</h1>
           </div>
-          <p className="text-sm text-gray-500 ml-11">
+          <p className="text-sm text-muted-foreground ml-11">
             자세 분석 데이터를 한눈에 확인하세요
           </p>
         </motion.div>
@@ -421,7 +418,7 @@ export default function StatsPage() {
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-lg bg-yellow-500/100/10 flex items-center justify-center">
                         <Award className="w-4 h-4 text-yellow-500" />
                       </div>
                       <span className="text-sm text-muted-foreground">최고 점수</span>
@@ -437,7 +434,7 @@ export default function StatsPage() {
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-lg bg-blue-500/100/10 flex items-center justify-center">
                         <Activity className="w-4 h-4 text-blue-500" />
                       </div>
                       <span className="text-sm text-muted-foreground">총 분석</span>
@@ -777,6 +774,6 @@ export default function StatsPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </>
+    </SidebarLayout>
   );
 }

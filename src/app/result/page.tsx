@@ -11,14 +11,11 @@ import {
   ChevronDown,
   ChevronRight,
   Dumbbell,
-  Check,
   AlertCircle,
-  TrendingUp,
   Home,
   Download,
   FileText,
   ArrowLeft,
-  Loader2,
   Target,
   Sparkles,
   Scale,
@@ -28,15 +25,14 @@ import {
   HeartPulse,
   Clock,
   Lightbulb,
-  Camera,
-  Box,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAnalysisResult, useCapturedImages, useJointAngles, useLandmarks } from '@/store/useStore';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { saveAnalysisResult, type AnalysisResultRow } from '@/lib/supabase';
 import type { AnalysisItem } from '@/lib/poseAnalysis';
-import AppHeader from '@/components/layout/AppHeader';
+// AppHeader는 SidebarLayout에서 처리됨
+import SidebarLayout from '@/components/layout/SidebarLayout';
 import { devLog } from '@/lib/logger';
 
 // 질환 위험도 분석 모듈
@@ -72,10 +68,9 @@ import {
 // 고급 분석 리포트 컴포넌트
 import AdvancedReport, { BalanceCard } from '@/components/analysis/AdvancedReport';
 
-// 3D 스켈레톤 시각화 컴포넌트 (OpenCap Kinematic 스타일)
-import Skeleton3D from '@/components/analysis/Skeleton3D';
-// 3D 모델 스켈레톤 (ReadyPlayerMe GLTF)
-import Skeleton3DModel from '@/components/analysis/Skeleton3DModel';
+// 3D 스켈레톤 시각화 컴포넌트 (추후 사용 예정)
+// import Skeleton3D from '@/components/analysis/Skeleton3D';
+// import Skeleton3DModel from '@/components/analysis/Skeleton3DModel';
 
 // shadcn/ui 컴포넌트
 import { Card, CardContent } from '@/components/ui/card';
@@ -309,9 +304,9 @@ function _DiseaseRiskCard({
         className="w-full px-4 py-4 flex items-center gap-3 text-left transition-colors hover:bg-muted/50"
       >
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-          disease.level === 'low' ? 'bg-emerald-100' :
-          disease.level === 'medium' ? 'bg-yellow-100' :
-          disease.level === 'high' ? 'bg-orange-100' : 'bg-red-100'
+          disease.level === 'low' ? 'bg-emerald-500/20' :
+          disease.level === 'medium' ? 'bg-yellow-500/20' :
+          disease.level === 'high' ? 'bg-orange-500/20' : 'bg-red-500/20'
         }`}>
           <HeartPulse className={`w-5 h-5 ${riskColorClass}`} />
         </div>
@@ -610,9 +605,9 @@ function AnalysisItemCard({
         >
           <div className={`
             w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
-            ${item.grade === 'good' ? 'bg-green-100' : item.grade === 'warning' ? 'bg-amber-100' : 'bg-red-100'}
+            ${item.grade === 'good' ? 'bg-green-500/20' : item.grade === 'warning' ? 'bg-amber-500/20' : 'bg-red-500/20'}
           `}>
-            <div className={`w-3 h-3 rounded-full ${item.grade === 'good' ? 'bg-green-500' : item.grade === 'warning' ? 'bg-amber-500' : 'bg-red-500'}`} />
+            <div className={`w-3 h-3 rounded-full ${item.grade === 'good' ? 'bg-green-500/100' : item.grade === 'warning' ? 'bg-amber-500/100' : 'bg-red-500/100'}`} />
           </div>
 
           <div className="flex-1 min-w-0">
@@ -653,7 +648,7 @@ function AnalysisItemCard({
                   <Progress value={scoreValue} className="h-2" />
                 </div>
 
-                <div className={`rounded-xl p-3 mb-3 ${item.grade === 'good' ? 'bg-green-50' : item.grade === 'warning' ? 'bg-amber-50' : 'bg-red-50'}`}>
+                <div className={`rounded-xl p-3 mb-3 ${item.grade === 'good' ? 'bg-green-500/10' : item.grade === 'warning' ? 'bg-amber-500/10' : 'bg-red-500/10'}`}>
                   <p className="text-sm text-foreground leading-relaxed">
                     {detail}
                   </p>
@@ -689,14 +684,19 @@ export default function ResultPage() {
   const storedLandmarks = useLandmarks();
 
   const [openItemId, setOpenItemId] = useState<string | null>(null);
-  // 3D 스켈레톤 뷰 전환 상태 ('front' | 'side')
+  // 3D 스켈레톤 뷰 전환 상태 (추후 사용 예정)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [skeleton3DView, setSkeleton3DView] = useState<'front' | 'side'>('front');
-  // 3D 모델 모드 토글 (true: GLTF 모델, false: 스틱 피겨)
+  // 3D 모델 모드 토글 (추후 사용 예정)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [use3DModel, setUse3DModel] = useState<boolean>(true);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isSaved, setIsSaved] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isSaving, setIsSaving] = useState(false);
 
   // 아코디언 상태 (기본 접힘)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isSkeletonOpen, setIsSkeletonOpen] = useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isBalanceOpen, setIsBalanceOpen] = useState(false);
@@ -791,9 +791,9 @@ export default function ResultPage() {
       // 활성화된 분석 항목만 필터링
       return filterEnabledItems(allItems);
     }
-    // localStorage 기록인 경우
+    // localStorage 기록인 경우 - 활성화된 항목만 필터링
     if (localHistoryRecord?.items) {
-      return localHistoryRecord.items as ExtendedAnalysisItem[];
+      return filterEnabledItems(localHistoryRecord.items as ExtendedAnalysisItem[]);
     }
     return [];
   }, [historyRecord, localHistoryRecord]);
@@ -805,7 +805,8 @@ export default function ResultPage() {
     ? (historyRecord?.overall_score ?? localHistoryRecord?.score ?? 72)
     : (analysisResult?.overallScore || 72);
 
-  // 기록 조회 시 이미지는 기록에서 가져오기
+  // 기록 조회 시 이미지는 기록에서 가져오기 (추후 사용 예정)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const displayImages = useMemo(() => {
     if (isFromHistory && localHistoryRecord?.capturedImages) {
       return localHistoryRecord.capturedImages;
@@ -822,6 +823,7 @@ export default function ResultPage() {
   // 2. 새 분석인 경우: store의 storedLandmarks 사용
   // 3. 데이터 없는 경우: 테스트용 더미 데이터 사용
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { displayLandmarks } = useMemo(() => {
     // 1. 히스토리에서 온 경우
     if (isFromHistory && localHistoryRecord?.landmarks) {
@@ -897,6 +899,7 @@ export default function ResultPage() {
 
       // 분석 결과에서 관절각 추정
       return {
+        neck: headItem ? Math.min(30, Math.max(0, headItem.value * 3)) : 15,
         trunk: headItem ? Math.min(25, Math.max(0, headItem.value * 2)) : 8,
         hipLeft: 175 - (pelvisItem?.value || 0) * 2,
         hipRight: 175 + (pelvisItem?.value || 0) * 2,
@@ -951,10 +954,28 @@ export default function ResultPage() {
     return getAsymmetrySummary(asymmetryResults);
   }, [asymmetryResults]);
 
-  // 분석 결과 저장
+  // 분석 결과 저장 (Supabase)
+  // ============================================================
+  // 중복 저장 방지:
+  // 1. hasSavedRef로 컴포넌트 내 중복 호출 방지
+  // 2. sessionStorage로 같은 분석 결과 재저장 방지 (브라우저 탭 내)
+  // 3. isFromHistory로 기록 조회 시 저장 방지
+  // ============================================================
   useEffect(() => {
     const saveResult = async () => {
-      if (!user || !analysisResult || hasSavedRef.current || isFromHistory) return;
+      // 기본 조건 체크
+      if (!user || !analysisResult || isFromHistory) return;
+      
+      // 이미 저장된 경우 스킵 (ref 체크)
+      if (hasSavedRef.current) return;
+      
+      // 같은 분석 결과 중복 저장 방지 (analyzedAt을 키로 사용)
+      const saveKey = `saved_analysis_${analysisResult.analyzedAt}`;
+      if (sessionStorage.getItem(saveKey)) {
+        devLog('[Result] 이미 저장된 분석 결과, 스킵:', analysisResult.analyzedAt);
+        setIsSaved(true);
+        return;
+      }
 
       hasSavedRef.current = true;
       setIsSaving(true);
@@ -974,9 +995,14 @@ export default function ResultPage() {
           pose_data: { analyzedAt: analysisResult.analyzedAt },
         });
 
+        // 저장 완료 표시 (sessionStorage)
+        sessionStorage.setItem(saveKey, 'true');
         setIsSaved(true);
+        devLog('[Result] 분석 결과 저장 완료:', analysisResult.analyzedAt);
       } catch (error) {
         console.error('분석 결과 저장 실패:', error);
+        // 저장 실패 시 ref 리셋 (재시도 가능하도록)
+        hasSavedRef.current = false;
       } finally {
         setIsSaving(false);
       }
@@ -1053,20 +1079,15 @@ export default function ResultPage() {
 
   const normalCount = results.filter((item) => item.grade === 'good').length;
   const warningCount = results.filter((item) => item.grade !== 'good').length;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const scoreMessage = getScoreMessage(overallScore);
 
   // ============================================================
-  // 전체 자세 점수 계산 (요약 카드용)
+  // 전체 자세 점수 (요약 카드용) - 실제 분석 점수 사용
   // ============================================================
-  const summaryScore = useMemo(() => {
-    // 거북목, 라운드숄더 위험도 기반 계산
-    const forwardHeadRisk = diseaseRiskAnalysis.diseases.find(d => d.id === 'forward_head')?.risk ?? 50;
-    const roundShoulderRisk = diseaseRiskAnalysis.diseases.find(d => d.id === 'round_shoulder')?.risk ?? 50;
-
-    // (100 - 거북목위험도 + 100 - 라운드숄더위험도) / 2
-    const score = Math.round((100 - forwardHeadRisk + 100 - roundShoulderRisk) / 2);
-    return Math.max(0, Math.min(100, score));
-  }, [diseaseRiskAnalysis]);
+  // 기존: diseaseRiskAnalysis 기반 계산 → 버그 원인 (항상 100점에 가깝게 나옴)
+  // 수정: poseAnalysis에서 계산된 실제 overallScore 사용
+  const summaryScore = overallScore;
 
   const getSummaryMessage = (score: number): string => {
     if (score >= 90) return '아주 좋은 자세예요!';
@@ -1083,13 +1104,11 @@ export default function ResultPage() {
   };
 
   return (
-    <>
-      <AppHeader />
-
-      <div className="min-h-screen bg-slate-50 pb-32 pt-14">
+    <SidebarLayout>
+      <div className="min-h-screen bg-background pb-32">
         {/* 상단 헤더 */}
         <motion.header
-          className="bg-white px-5 pt-4 pb-4 border-b border-gray-100 sticky top-14 z-30"
+          className="bg-card px-5 pt-4 pb-4 border-b border-border sticky top-0 z-30"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -1097,7 +1116,7 @@ export default function ResultPage() {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => isFromHistory ? router.push('/history') : router.push('/dashboard')}
+              onClick={() => isFromHistory ? router.push('/history') : router.push('/')}
             >
               {isFromHistory ? <ArrowLeft className="h-4 w-4" /> : <Home className="h-4 w-4" />}
             </Button>
@@ -1127,12 +1146,12 @@ export default function ResultPage() {
           {/* 전체 자세 점수 요약 카드 */}
           {/* ============================================================ */}
           <motion.section variants={itemVariants}>
-            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm text-center">
-              <p className="text-sm text-gray-500 mb-2">전체 자세 점수</p>
+            <div className="bg-card border border-border rounded-xl p-5 shadow-sm text-center">
+              <p className="text-sm text-muted-foreground mb-2">전체 자세 점수</p>
               <p className={`text-4xl font-bold ${getSummaryScoreColor(summaryScore)}`}>
-                {summaryScore}점 <span className="text-lg font-normal text-gray-400">/ 100점</span>
+                {summaryScore}점 <span className="text-lg font-normal text-muted-foreground">/ 100점</span>
               </p>
-              <p className="text-gray-600 mt-3">{getSummaryMessage(summaryScore)}</p>
+              <p className="text-muted-foreground mt-3">{getSummaryMessage(summaryScore)}</p>
             </div>
           </motion.section>
 
@@ -1141,19 +1160,19 @@ export default function ResultPage() {
           {/* ============================================================ */}
           <motion.section variants={itemVariants} className="space-y-3">
             {diseaseRiskAnalysis.diseases.map((disease) => (
-              <div key={disease.id} className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+              <div key={disease.id} className="bg-card border border-border rounded-xl shadow-sm p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      disease.level === 'low' ? 'bg-emerald-100' :
-                      disease.level === 'medium' ? 'bg-yellow-100' :
-                      disease.level === 'high' ? 'bg-orange-100' : 'bg-red-100'
+                      disease.level === 'low' ? 'bg-emerald-500/20' :
+                      disease.level === 'medium' ? 'bg-yellow-500/20' :
+                      disease.level === 'high' ? 'bg-orange-500/20' : 'bg-red-500/20'
                     }`}>
                       <HeartPulse className={`w-5 h-5 ${getRiskColorClass(disease.level)}`} />
                     </div>
                     <div>
-                      <p className="font-semibold text-gray-800">{disease.name}</p>
-                      <p className="text-xs text-gray-500">{disease.description}</p>
+                      <p className="font-semibold text-foreground">{disease.name}</p>
+                      <p className="text-xs text-muted-foreground">{disease.description}</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -1178,7 +1197,7 @@ export default function ResultPage() {
           <motion.section variants={itemVariants}>
             {exerciseRecommendation.recommendedPrograms.length > 0 && (
               <button
-                className="w-full py-4 flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium rounded-2xl border border-blue-100 shadow-sm transition-all"
+                className="w-full py-4 flex items-center justify-center gap-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 font-medium rounded-2xl border border-blue-500/30 shadow-sm transition-all"
                 onClick={() => router.push(`/exercise?program=${exerciseRecommendation.recommendedPrograms[0].id}`)}
               >
                 <Dumbbell className="w-5 h-5" />
@@ -1193,17 +1212,19 @@ export default function ResultPage() {
           {/* ============================================================ */}
           <motion.section variants={itemVariants} className="space-y-4">
 
-            {/* 🦴 3D 스켈레톤 보기 */}
-            <div className="border border-gray-200 rounded-xl overflow-hidden">
+            {/* 🦴 3D 스켈레톤 보기 - 추후 구현 예정으로 임시 숨김 */}
+            {/* TODO: OpenCap 스타일 3D 스켈레톤 제대로 구현 후 활성화 */}
+            {/*
+            <div className="border border-border rounded-xl overflow-hidden">
               <button
                 onClick={() => setIsSkeletonOpen(!isSkeletonOpen)}
-                className="w-full p-4 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors"
+                className="w-full p-4 flex justify-between items-center bg-card hover:bg-muted transition-colors"
               >
-                <span className="font-medium text-gray-800 flex items-center gap-2">
+                <span className="font-medium text-foreground flex items-center gap-2">
                   <Box className="w-4 h-4 text-blue-500" />
                   3D 스켈레톤 보기
                 </span>
-                <ChevronDown className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isSkeletonOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 ${isSkeletonOpen ? 'rotate-180' : ''}`} />
               </button>
               <AnimatePresence>
                 {isSkeletonOpen && (
@@ -1212,12 +1233,11 @@ export default function ResultPage() {
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.2 }}
-                    className="border-t border-gray-200 bg-gray-50"
+                    className="border-t border-border bg-muted"
                   >
                     <div className="p-4">
-                      {/* 뷰 버튼 */}
                       <div className="flex justify-center mb-4">
-                        <div className="flex gap-1 bg-white border p-1 rounded-lg">
+                        <div className="flex gap-1 bg-card border p-1 rounded-lg">
                           {(['front', 'side'] as const).map((view) => (
                             <button
                               key={view}
@@ -1225,7 +1245,7 @@ export default function ResultPage() {
                               className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${
                                 skeleton3DView === view
                                   ? 'bg-primary text-primary-foreground'
-                                  : 'text-muted-foreground hover:bg-gray-100'
+                                  : 'text-muted-foreground hover:bg-accent'
                               }`}
                             >
                               {view === 'front' ? '정면' : '측면'}
@@ -1234,13 +1254,11 @@ export default function ResultPage() {
                         </div>
                         <button
                           onClick={() => setUse3DModel(!use3DModel)}
-                          className="ml-2 px-3 py-1.5 text-xs font-medium rounded-lg border bg-white hover:bg-gray-50"
+                          className="ml-2 px-3 py-1.5 text-xs font-medium rounded-lg border bg-card hover:bg-muted"
                         >
                           {use3DModel ? '3D 모델' : '스틱'}
                         </button>
                       </div>
-
-                      {/* 3D 뷰어 */}
                       <div className="flex justify-center">
                         {displayLandmarks[skeleton3DView] ? (
                           use3DModel ? (
@@ -1259,8 +1277,8 @@ export default function ResultPage() {
                             />
                           )
                         ) : (
-                          <div className="w-[320px] h-[400px] bg-gray-200 rounded-lg flex items-center justify-center">
-                            <p className="text-sm text-gray-500">데이터 없음</p>
+                          <div className="w-[320px] h-[400px] bg-muted rounded-lg flex items-center justify-center">
+                            <p className="text-sm text-muted-foreground">데이터 없음</p>
                           </div>
                         )}
                       </div>
@@ -1269,20 +1287,21 @@ export default function ResultPage() {
                 )}
               </AnimatePresence>
             </div>
+            */}
 
             {/* 📐 상세 각도 분석 */}
             {jointAngles && (
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <div className="border border-border rounded-xl overflow-hidden">
                 <button
                   onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-                  className="w-full p-4 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors"
+                  className="w-full p-4 flex justify-between items-center bg-card hover:bg-muted transition-colors"
                 >
-                  <span className="font-medium text-gray-800 flex items-center gap-2">
+                  <span className="font-medium text-foreground flex items-center gap-2">
                     <Activity className="w-4 h-4 text-blue-500" />
                     상세 각도 분석
                     <span className="text-xs text-muted-foreground ml-1">ROM {romScore}%</span>
                   </span>
-                  <ChevronDown className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isAdvancedOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 ${isAdvancedOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <AnimatePresence>
                   {isAdvancedOpen && (
@@ -1291,7 +1310,7 @@ export default function ResultPage() {
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.2 }}
-                      className="border-t border-gray-200 bg-gray-50"
+                      className="border-t border-border bg-muted"
                     >
                       <div className="p-4">
                         <AdvancedReport
@@ -1308,17 +1327,17 @@ export default function ResultPage() {
 
             {/* 좌우 균형 (별도 아코디언) */}
             {asymmetryResults.length > 0 && (
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <div className="border border-border rounded-xl overflow-hidden">
                 <button
                   onClick={() => setIsBalanceOpen(!isBalanceOpen)}
-                  className="w-full p-4 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors"
+                  className="w-full p-4 flex justify-between items-center bg-card hover:bg-muted transition-colors"
                 >
-                  <span className="font-medium text-gray-800 flex items-center gap-2">
+                  <span className="font-medium text-foreground flex items-center gap-2">
                     <Scale className="w-4 h-4 text-blue-500" />
                     좌우 균형
                     <span className="text-xs text-muted-foreground ml-1">균형 {asymmetryScore}점</span>
                   </span>
-                  <ChevronDown className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isBalanceOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 ${isBalanceOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <AnimatePresence>
                   {isBalanceOpen && (
@@ -1327,7 +1346,7 @@ export default function ResultPage() {
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.2 }}
-                      className="border-t border-gray-200 bg-gray-50"
+                      className="border-t border-border bg-muted"
                     >
                       <div className="p-4">
                         <div className="grid grid-cols-2 gap-4">
@@ -1343,7 +1362,7 @@ export default function ResultPage() {
                               />
                             ))}
                         </div>
-                        <Card className="mt-3 bg-white">
+                        <Card className="mt-3 bg-card">
                           <CardContent className="p-3">
                             <p className="text-sm text-foreground">{asymmetrySummary}</p>
                           </CardContent>
@@ -1356,17 +1375,17 @@ export default function ResultPage() {
             )}
 
             {/* 📊 항목별 상세 분석 */}
-            <div className="border border-gray-200 rounded-xl overflow-hidden">
+            <div className="border border-border rounded-xl overflow-hidden">
               <button
                 onClick={() => setIsDetailedOpen(!isDetailedOpen)}
-                className="w-full p-4 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors"
+                className="w-full p-4 flex justify-between items-center bg-card hover:bg-muted transition-colors"
               >
-                <span className="font-medium text-gray-800 flex items-center gap-2">
+                <span className="font-medium text-foreground flex items-center gap-2">
                   <Target className="w-4 h-4 text-blue-500" />
                   항목별 상세 분석
                   <span className="text-xs text-muted-foreground ml-1">정상 {normalCount}개 · 주의 {warningCount}개</span>
                 </span>
-                <ChevronDown className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isDetailedOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 ${isDetailedOpen ? 'rotate-180' : ''}`} />
               </button>
               <AnimatePresence>
                 {isDetailedOpen && (
@@ -1375,7 +1394,7 @@ export default function ResultPage() {
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.2 }}
-                    className="border-t border-gray-200 bg-gray-50"
+                    className="border-t border-border bg-muted"
                   >
                     <div className="p-4 space-y-3">
                       {results.map((item, index) => (
@@ -1397,7 +1416,7 @@ export default function ResultPage() {
 
           {/* 팁 카드 */}
           <motion.section variants={itemVariants}>
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
               <p className="text-sm text-blue-800">
                 <strong>💡 팁</strong> · 하루 10분씩 스트레칭을 하면 자세 개선에 효과적이에요!
               </p>
@@ -1406,10 +1425,10 @@ export default function ResultPage() {
         </motion.div>
 
         {/* 하단 액션 버튼 */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t border-border">
           <div className="flex gap-3">
             <button
-              className="flex-1 py-3 flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-600 font-medium rounded-2xl border border-gray-200 shadow-sm transition-all"
+              className="flex-1 py-3 flex items-center justify-center gap-2 bg-card hover:bg-muted text-muted-foreground font-medium rounded-2xl border border-border shadow-sm transition-all"
               onClick={handleDownloadPDF}
             >
               <FileText className="w-5 h-5" />
@@ -1417,7 +1436,7 @@ export default function ResultPage() {
             </button>
 
             <button
-              className="flex-1 py-3 flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-medium rounded-2xl border border-emerald-100 shadow-sm transition-all"
+              className="flex-1 py-3 flex items-center justify-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 font-medium rounded-2xl border border-emerald-500/30 shadow-sm transition-all"
               onClick={() => router.push('/exercise')}
             >
               <Dumbbell className="w-5 h-5" />
@@ -1426,6 +1445,6 @@ export default function ResultPage() {
           </div>
         </div>
       </div>
-    </>
+    </SidebarLayout>
   );
 }

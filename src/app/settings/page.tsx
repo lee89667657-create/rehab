@@ -26,14 +26,14 @@ import {
   ChevronRight,
   LogOut,
   Mail,
-  Moon,
   Smartphone,
   X,
   Check,
   Trash2,
   Activity,
 } from 'lucide-react';
-import AppHeader from '@/components/layout/AppHeader';
+// AppHeader는 SidebarLayout에서 처리됨
+import SidebarLayout from '@/components/layout/SidebarLayout';
 import { useAuth } from '@/components/providers/AuthProvider';
 
 // ============================================================
@@ -82,13 +82,13 @@ function ToggleSwitch({ enabled, onToggle }: ToggleSwitchProps) {
       className={`
         relative w-12 h-7 rounded-full
         transition-colors duration-300
-        ${enabled ? 'bg-blue-500' : 'bg-gray-200'}
+        ${enabled ? 'bg-blue-500/100/100' : 'bg-muted'}
       `}
     >
       <div
         className={`
           absolute top-1 w-5 h-5 rounded-full
-          bg-white shadow-sm
+          bg-card shadow-sm
           transition-transform duration-300
           ${enabled ? 'translate-x-6' : 'translate-x-1'}
         `}
@@ -146,24 +146,24 @@ function Modal({ isOpen, onClose, title, children }: ModalProps) {
             className="
               fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2
               w-[90%] max-w-md
-              bg-white rounded-2xl
+              bg-card rounded-2xl
               shadow-xl z-[70]
               overflow-hidden
             "
           >
             {/* 헤더 */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h3 className="text-lg font-semibold text-foreground">{title}</h3>
               <button
                 onClick={onClose}
                 className="
                   w-8 h-8 rounded-lg
-                  bg-gray-50 hover:bg-gray-100
+                  bg-muted hover:bg-accent/80
                   flex items-center justify-center
                   transition-colors duration-300
                 "
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <X className="w-5 h-5 text-muted-foreground" />
               </button>
             </div>
 
@@ -196,18 +196,18 @@ function SettingToggleItem({ icon, label, description, enabled, onToggle }: Sett
       className="
         w-full flex items-center justify-between
         px-4 py-4
-        bg-white
-        border-b border-gray-100 last:border-b-0
+        bg-card
+        border-b border-border last:border-b-0
       "
     >
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+        <div className="w-9 h-9 rounded-xl bg-blue-500/100/10 flex items-center justify-center">
           {icon}
         </div>
         <div>
-          <span className="font-medium text-gray-800">{label}</span>
+          <span className="font-medium text-foreground">{label}</span>
           {description && (
-            <p className="text-xs text-gray-400 mt-0.5">{description}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
           )}
         </div>
       </div>
@@ -235,17 +235,17 @@ function SettingItem({ icon, label, value, onClick, danger }: SettingItemProps) 
       className={`
         w-full flex items-center justify-between
         px-4 py-4
-        bg-white
-        hover:bg-gray-50
+        bg-card
+        hover:bg-muted
         transition-colors duration-300
-        border-b border-gray-100 last:border-b-0
-        ${danger ? 'text-red-500' : 'text-gray-800'}
+        border-b border-border last:border-b-0
+        ${danger ? 'text-red-500' : 'text-foreground'}
       `}
     >
       <div className="flex items-center gap-3">
         <div className={`
           w-9 h-9 rounded-xl
-          ${danger ? 'bg-red-50' : 'bg-blue-50'}
+          ${danger ? 'bg-red-500/100/10' : 'bg-blue-500/100/10'}
           flex items-center justify-center
         `}>
           {icon}
@@ -255,9 +255,9 @@ function SettingItem({ icon, label, value, onClick, danger }: SettingItemProps) 
 
       <div className="flex items-center gap-2">
         {value && (
-          <span className="text-sm text-gray-400">{value}</span>
+          <span className="text-sm text-muted-foreground">{value}</span>
         )}
-        <ChevronRight className="w-5 h-5 text-gray-300" />
+        <ChevronRight className="w-5 h-5 text-muted-foreground" />
       </div>
     </button>
   );
@@ -275,13 +275,13 @@ interface SettingGroupProps {
 function SettingGroup({ title, children }: SettingGroupProps) {
   return (
     <motion.div variants={itemVariants} className="mb-6">
-      <h2 className="text-sm font-semibold text-gray-500 px-4 mb-2">
+      <h2 className="text-sm font-semibold text-muted-foreground px-4 mb-2">
         {title}
       </h2>
       <div className="
-        bg-white
+        bg-card
         rounded-xl
-        border border-gray-100
+        border border-border
         shadow-sm
         overflow-hidden
       ">
@@ -297,6 +297,7 @@ function SettingGroup({ title, children }: SettingGroupProps) {
 
 type DarkModeOption = 'system' | 'light' | 'dark';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const darkModeLabels: Record<DarkModeOption, string> = {
   system: '시스템 설정',
   light: '라이트 모드',
@@ -335,6 +336,7 @@ export default function SettingsPage() {
 
   // 모달 상태
   const [showReminderModal, setShowReminderModal] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showDarkModeModal, setShowDarkModeModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showAppInfoModal, setShowAppInfoModal] = useState(false);
@@ -391,7 +393,8 @@ export default function SettingsPage() {
     setShowReminderModal(false);
   };
 
-  // 다크 모드 변경
+  // 다크 모드 변경 (추후 사용 예정)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleDarkModeChange = (mode: DarkModeOption) => {
     setDarkMode(mode);
     saveSettings({ darkMode: mode });
@@ -423,19 +426,16 @@ export default function SettingsPage() {
   const userName = user?.user_metadata?.name || '사용자';
 
   return (
-    <>
-      {/* 앱 공통 헤더 */}
-      <AppHeader />
-
-      <div className="min-h-screen bg-slate-50 pb-24 pt-14">
+    <SidebarLayout>
+      <div className="min-h-screen bg-background pb-24">
         {/* 페이지 헤더 */}
         <motion.div
-          className="bg-white px-5 py-6 border-b border-gray-100"
+          className="bg-card px-5 py-6 border-b border-border"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-xl font-semibold text-gray-800">설정</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-xl font-semibold text-foreground">설정</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             앱 설정을 관리하세요
           </p>
         </motion.div>
@@ -450,12 +450,12 @@ export default function SettingsPage() {
           {/* 프로필 카드 */}
           <motion.div
             variants={itemVariants}
-            className="bg-white rounded-xl p-5 mb-6 border border-gray-100 shadow-sm"
+            className="bg-card rounded-xl p-5 mb-6 border border-border shadow-sm"
           >
             <div className="flex items-center gap-4">
               <div className="
                 w-16 h-16 rounded-xl
-                bg-blue-500
+                bg-blue-500/100/100
                 flex items-center justify-center
                 shadow-lg shadow-blue-500/20
               ">
@@ -464,8 +464,8 @@ export default function SettingsPage() {
                 </span>
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-800">{userName}</h3>
-                <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-0.5">
+                <h3 className="text-lg font-semibold text-foreground">{userName}</h3>
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
                   <Mail className="w-3.5 h-3.5" />
                   {userEmail}
                 </p>
@@ -494,10 +494,10 @@ export default function SettingsPage() {
                 onClick={() => setShowReminderModal(true)}
                 className="
                   w-full px-4 py-3
-                  bg-gray-50
+                  bg-muted
                   text-sm text-blue-500 font-medium
                   text-left
-                  hover:bg-blue-50
+                  hover:bg-blue-500/200/100/100/10
                   transition-colors duration-300
                 "
               >
@@ -508,12 +508,6 @@ export default function SettingsPage() {
 
           {/* 앱 설정 */}
           <SettingGroup title="앱">
-            <SettingItem
-              icon={<Moon className="w-5 h-5 text-blue-500" />}
-              label="다크 모드"
-              value={darkModeLabels[darkMode]}
-              onClick={() => setShowDarkModeModal(true)}
-            />
             <SettingItem
               icon={<Shield className="w-5 h-5 text-blue-500" />}
               label="개인정보 처리방침"
@@ -544,8 +538,8 @@ export default function SettingsPage() {
 
           {/* 앱 버전 정보 */}
           <motion.div variants={itemVariants} className="text-center py-8">
-            <p className="text-sm text-gray-400">PostureAI v1.0.0</p>
-            <p className="text-xs text-gray-300 mt-1">
+            <p className="text-sm text-muted-foreground">PostureAI v1.0.0</p>
+            <p className="text-xs text-muted-foreground mt-1">
               © 2024 PostureAI. All rights reserved.
             </p>
           </motion.div>
@@ -572,8 +566,8 @@ export default function SettingsPage() {
                 flex items-center justify-between
                 transition-colors duration-300
                 ${time === reminderTime
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-50 text-gray-800 hover:bg-blue-50'
+                  ? 'bg-blue-500/100/100 text-white'
+                  : 'bg-muted text-foreground hover:bg-blue-500/200/100/100/10'
                 }
               `}
             >
@@ -584,61 +578,30 @@ export default function SettingsPage() {
         </div>
       </Modal>
 
-      {/* 다크 모드 선택 모달 */}
-      <Modal
-        isOpen={showDarkModeModal}
-        onClose={() => setShowDarkModeModal(false)}
-        title="다크 모드"
-      >
-        <div className="space-y-2">
-          {(Object.keys(darkModeLabels) as DarkModeOption[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => handleDarkModeChange(mode)}
-              className={`
-                w-full px-4 py-3 rounded-xl
-                flex items-center justify-between
-                transition-colors duration-300
-                ${mode === darkMode
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-50 text-gray-800 hover:bg-blue-50'
-                }
-              `}
-            >
-              <span className="font-medium">{darkModeLabels[mode]}</span>
-              {mode === darkMode && <Check className="w-5 h-5" />}
-            </button>
-          ))}
-        </div>
-        <p className="text-xs text-gray-400 mt-4">
-          * 다크 모드 기능은 추후 업데이트 예정입니다.
-        </p>
-      </Modal>
-
       {/* 개인정보 처리방침 모달 */}
       <Modal
         isOpen={showPrivacyModal}
         onClose={() => setShowPrivacyModal(false)}
         title="개인정보 처리방침"
       >
-        <div className="text-sm text-gray-500 space-y-4 leading-relaxed">
+        <div className="text-sm text-muted-foreground space-y-4 leading-relaxed">
           <p>
-            <strong className="text-gray-800">1. 수집하는 개인정보</strong>
+            <strong className="text-foreground">1. 수집하는 개인정보</strong>
             <br />
             PostureAI는 서비스 제공을 위해 이메일, 이름, 자세 분석 데이터를 수집합니다.
           </p>
           <p>
-            <strong className="text-gray-800">2. 개인정보의 이용 목적</strong>
+            <strong className="text-foreground">2. 개인정보의 이용 목적</strong>
             <br />
             수집된 정보는 자세 분석, 맞춤 운동 추천, 서비스 개선에 활용됩니다.
           </p>
           <p>
-            <strong className="text-gray-800">3. 개인정보의 보관 기간</strong>
+            <strong className="text-foreground">3. 개인정보의 보관 기간</strong>
             <br />
             회원 탈퇴 시 즉시 파기되며, 관련 법령에 따라 일정 기간 보관이 필요한 경우 해당 기간 동안 보관됩니다.
           </p>
           <p>
-            <strong className="text-gray-800">4. 문의</strong>
+            <strong className="text-foreground">4. 문의</strong>
             <br />
             개인정보 관련 문의: privacy@postureai.com
           </p>
@@ -656,7 +619,7 @@ export default function SettingsPage() {
           {/* 앱 아이콘 (이모지 대신 Lucide 아이콘) */}
           <div className="
             w-20 h-20 mx-auto mb-4
-            bg-blue-500
+            bg-blue-500/100/100
             rounded-xl
             flex items-center justify-center
             shadow-lg shadow-blue-500/20
@@ -664,13 +627,13 @@ export default function SettingsPage() {
             <Activity className="w-10 h-10 text-white" />
           </div>
 
-          <h3 className="text-xl font-semibold text-gray-800">PostureAI</h3>
-          <p className="text-sm text-gray-500 mt-1">버전 1.0.0</p>
+          <h3 className="text-xl font-semibold text-foreground">PostureAI</h3>
+          <p className="text-sm text-muted-foreground mt-1">버전 1.0.0</p>
 
-          <div className="mt-6 pt-6 border-t border-gray-100 text-sm text-gray-500 space-y-2">
+          <div className="mt-6 pt-6 border-t border-border text-sm text-muted-foreground space-y-2">
             <p>AI 기반 자세 분석 서비스</p>
             <p>MediaPipe 기술을 활용한 정확한 자세 측정</p>
-            <p className="text-xs text-gray-400 mt-4">
+            <p className="text-xs text-muted-foreground mt-4">
               © 2024 PostureAI. All rights reserved.
             </p>
           </div>
@@ -685,9 +648,9 @@ export default function SettingsPage() {
       >
         <div className="space-y-3">
           {/* 이메일 정보 */}
-          <div className="p-4 bg-gray-50 rounded-xl">
-            <p className="text-xs text-gray-400 mb-1">로그인 이메일</p>
-            <p className="font-medium text-gray-800">{userEmail}</p>
+          <div className="p-4 bg-muted rounded-xl">
+            <p className="text-xs text-muted-foreground mb-1">로그인 이메일</p>
+            <p className="font-medium text-foreground">{userEmail}</p>
           </div>
 
           {/* 비밀번호 변경 */}
@@ -697,8 +660,8 @@ export default function SettingsPage() {
             }}
             className="
               w-full px-4 py-3 rounded-xl
-              bg-gray-50 hover:bg-blue-50
-              text-gray-800 font-medium
+              bg-muted hover:bg-blue-500/200/100/100/10
+              text-foreground font-medium
               text-left
               transition-colors duration-300
             "
@@ -715,7 +678,7 @@ export default function SettingsPage() {
             }}
             className="
               w-full px-4 py-3 rounded-xl
-              bg-amber-50 hover:bg-amber-100
+              bg-amber-500/10 hover:bg-amber-500/20
               text-amber-600 font-medium
               text-left
               transition-colors duration-300
@@ -729,7 +692,7 @@ export default function SettingsPage() {
             onClick={() => setShowDeleteConfirm(true)}
             className="
               w-full px-4 py-3 rounded-xl
-              bg-red-50 hover:bg-red-100
+              bg-red-500/100/10 hover:bg-red-500/20
               text-red-500 font-medium
               text-left flex items-center gap-2
               transition-colors duration-300
@@ -750,17 +713,17 @@ export default function SettingsPage() {
         <div className="text-center">
           <div className="
             w-16 h-16 mx-auto mb-4
-            bg-red-50
+            bg-red-500/100/10
             rounded-full
             flex items-center justify-center
           ">
             <Trash2 className="w-8 h-8 text-red-500" />
           </div>
 
-          <p className="text-gray-800 font-medium mb-2">
+          <p className="text-foreground font-medium mb-2">
             정말 계정을 삭제하시겠습니까?
           </p>
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="text-sm text-muted-foreground mb-6">
             모든 데이터가 영구적으로 삭제되며
             <br />
             복구할 수 없습니다.
@@ -771,8 +734,8 @@ export default function SettingsPage() {
               onClick={() => setShowDeleteConfirm(false)}
               className="
                 flex-1 py-3 rounded-xl
-                bg-gray-100 hover:bg-gray-200
-                text-gray-500 font-medium
+                bg-accent hover:bg-muted
+                text-muted-foreground font-medium
                 transition-colors duration-300
               "
             >
@@ -782,7 +745,7 @@ export default function SettingsPage() {
               onClick={handleDeleteAccount}
               className="
                 flex-1 py-3 rounded-xl
-                bg-red-500 hover:bg-red-600
+                bg-red-500/100/100 hover:bg-red-600
                 text-white font-medium
                 transition-colors duration-300
               "
@@ -793,6 +756,6 @@ export default function SettingsPage() {
         </div>
       </Modal>
 
-    </>
+    </SidebarLayout>
   );
 }

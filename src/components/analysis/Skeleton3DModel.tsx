@@ -844,12 +844,12 @@ export default function Skeleton3DModel({
   if (!alignedLandmarks) {
     return (
       <div
-        className={`rounded-lg bg-[#0d1117] flex items-center justify-center ${className}`}
+        className={`rounded-lg bg-card flex items-center justify-center ${className}`}
         style={{ width, height }}
       >
-        <div className="text-center text-[#8b949e]">
+        <div className="text-center text-foreground">
           <svg
-            className="w-10 h-10 mx-auto mb-2 text-[#484f58]"
+            className="w-10 h-10 mx-auto mb-2 text-foreground"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -886,7 +886,7 @@ export default function Skeleton3DModel({
       </div>
 
       {/* 포인트 수 표시 - 우상단 */}
-      <div className="absolute top-4 right-4 bg-black/70 px-2.5 py-1.5 rounded text-xs text-gray-300 font-mono">
+      <div className="absolute top-4 right-4 bg-black/70 px-2.5 py-1.5 rounded text-xs text-muted-foreground font-mono">
         {pointCount}/33 pts
       </div>
 

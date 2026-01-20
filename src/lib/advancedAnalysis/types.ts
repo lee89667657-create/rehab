@@ -40,6 +40,7 @@ export interface SkeletonPoint {
  */
 export interface JointAngles {
   trunk: number;         // 몸통 기울기 (수직 기준, 도 단위)
+  neck: number;          // 목 전방 각도 (거북목 측정용, 귀-어깨 수직선 기준)
   hipLeft: number;       // 왼쪽 고관절 각도 (어깨-골반-무릎)
   hipRight: number;      // 오른쪽 고관절 각도
   kneeLeft: number;      // 왼쪽 무릎 각도 (골반-무릎-발목)

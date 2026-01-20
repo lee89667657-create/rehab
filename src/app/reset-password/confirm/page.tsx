@@ -68,10 +68,10 @@ function getPasswordStrength(password: string): PasswordStrength {
   if (/[0-9]/.test(password)) score++;
   if (/[^a-zA-Z0-9]/.test(password)) score++;
 
-  if (score <= 1) return { score, label: '약함', color: 'bg-red-500' };
-  if (score === 2) return { score, label: '보통', color: 'bg-yellow-500' };
-  if (score === 3) return { score, label: '강함', color: 'bg-blue-500' };
-  return { score, label: '매우 강함', color: 'bg-emerald-500' };
+  if (score <= 1) return { score, label: '약함', color: 'bg-red-500/100' };
+  if (score === 2) return { score, label: '보통', color: 'bg-yellow-500/100' };
+  if (score === 3) return { score, label: '강함', color: 'bg-blue-500/100' };
+  return { score, label: '매우 강함', color: 'bg-emerald-500/100' };
 }
 
 // ============================================================
@@ -313,7 +313,7 @@ export default function ResetPasswordConfirmPage() {
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-32 -right-32 w-64 h-64 bg-blue-400/15 rounded-full blur-3xl" />
         <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-cyan-400/15 rounded-full blur-3xl" />
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-blue-500/100/5 rounded-full blur-3xl" />
       </div>
 
       {/* 메인 콘텐츠 */}
@@ -349,7 +349,7 @@ export default function ResetPasswordConfirmPage() {
           <motion.div
             variants={itemVariants}
             className="
-              bg-white/80 backdrop-blur-xl
+              bg-card/80 backdrop-blur-xl
               rounded-3xl
               shadow-xl shadow-zinc-200/50
               border border-white
@@ -377,7 +377,7 @@ export default function ResetPasswordConfirmPage() {
                       border border-zinc-200/80
                       text-zinc-900 placeholder:text-zinc-400
                       focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
-                      focus:bg-white
+                      focus:bg-card
                       transition-all duration-200
                     "
                   />
@@ -411,7 +411,7 @@ export default function ResetPasswordConfirmPage() {
                       border
                       text-zinc-900 placeholder:text-zinc-400
                       focus:outline-none focus:ring-2 focus:border-transparent
-                      focus:bg-white
+                      focus:bg-card
                       transition-all duration-200
                       ${!passwordsMatch
                         ? 'border-red-300 focus:ring-red-500/50'
@@ -440,7 +440,7 @@ export default function ResetPasswordConfirmPage() {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-4 rounded-2xl bg-red-50 border border-red-100"
+                  className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30"
                 >
                   <p className="text-sm text-red-600 font-medium">{error}</p>
                 </motion.div>

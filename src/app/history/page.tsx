@@ -11,7 +11,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Calendar, TrendingUp, ChevronRight, Trash2, Loader2, User, BarChart3, ImageIcon, PieChart } from 'lucide-react';
-import AppHeader from '@/components/layout/AppHeader';
+// AppHeader는 SidebarLayout에서 처리됨
+import SidebarLayout from '@/components/layout/SidebarLayout';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getAnalysisHistory, deleteAnalysisResult, type AnalysisResultRow } from '@/lib/supabase';
 
@@ -136,6 +137,43 @@ export default function HistoryPage() {
   };
 
   // ============================================================
+  // 전체 기록 삭제
+  // ============================================================
+  const handleDeleteAll = async () => {
+    const count = user ? supabaseRecords.length : localRecords.length;
+    if (count === 0) return;
+
+    if (!confirm(`${count}개의 기록을 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+
+    setDeletingId('all');
+    try {
+      if (user) {
+        // Supabase 기록 전체 삭제 - Promise.all로 병렬 처리
+        const deletePromises = supabaseRecords.map((record) => 
+          deleteAnalysisResult(record.id)
+        );
+        await Promise.all(deletePromises);
+        setSupabaseRecords([]);
+      } else {
+        // localStorage 기록 전체 삭제
+        localStorage.setItem('analysisHistory', '[]');
+        setLocalRecords([]);
+      }
+      alert('모든 기록이 삭제되었습니다.');
+    } catch (error) {
+      console.error('Failed to delete all records:', error);
+      alert('삭제 중 오류가 발생했습니다. 일부 기록이 남아있을 수 있습니다.');
+      // 삭제 실패 시 다시 불러오기
+      if (user) {
+        const data = await getAnalysisHistory(user.id);
+        setSupabaseRecords(data || []);
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // ============================================================
   // 분석 기록 불러오기 (Supabase + localStorage)
   // ============================================================
   useEffect(() => {
@@ -164,8 +202,8 @@ export default function HistoryPage() {
     fetchRecords();
   }, [user]);
 
-  // 전체 기록 수
-  const totalRecords = supabaseRecords.length + localRecords.length;
+  // 전체 기록 수 (로그인 유저는 Supabase만, 비로그인은 localStorage만)
+  const totalRecords = user ? supabaseRecords.length : localRecords.length;
 
   // 날짜 포맷팅
   const formatDate = (dateString: string) => {
@@ -185,32 +223,48 @@ export default function HistoryPage() {
   };
 
   return (
-    <>
-      <AppHeader />
-
-      <div className="min-h-screen bg-slate-50 pb-24 pt-14">
+    <SidebarLayout>
+      <div className="min-h-screen bg-background pb-24">
         {/* 페이지 헤더 */}
         <motion.div
-          className="bg-white px-5 py-6 border-b border-gray-100"
+          className="bg-card px-5 py-6 border-b border-border"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-semibold text-gray-800">기록</h1>
-              <p className="text-sm text-gray-500 mt-1">
+              <h1 className="text-xl font-semibold text-foreground">기록</h1>
+              <p className="text-sm text-muted-foreground mt-1">
                 자세 분석 기록을 확인하세요
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push('/stats')}
-              className="flex items-center gap-1"
-            >
-              <PieChart className="w-4 h-4" />
-              통계
-            </Button>
+            <div className="flex items-center gap-2">
+              {totalRecords > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDeleteAll}
+                  disabled={deletingId === 'all'}
+                  className="flex items-center gap-1 text-red-500 border-red-200 hover:bg-red-500/200/10 hover:text-red-600"
+                >
+                  {deletingId === 'all' ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  전체 삭제
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/stats')}
+                className="flex items-center gap-1"
+              >
+                <PieChart className="w-4 h-4" />
+                통계
+              </Button>
+            </div>
           </div>
         </motion.div>
 
@@ -243,9 +297,9 @@ export default function HistoryPage() {
             /* 기록이 있을 때 */
             <div className="space-y-4">
               {/* ============================================================ */}
-              {/* localStorage 기록 (최근 분석) */}
+              {/* 비로그인 유저: localStorage 기록만 표시 */}
               {/* ============================================================ */}
-              {localRecords.map((record) => (
+              {!user && localRecords.map((record) => (
                 <motion.div key={`local-${record.id}`} variants={itemVariants}>
                   <Card
                     onClick={() => handleViewLocalRecord(record)}
@@ -254,7 +308,7 @@ export default function HistoryPage() {
                     <CardContent className="p-4">
                       <div className="flex items-center gap-4">
                         {/* 썸네일 - 촬영 이미지 표시 */}
-                        <div className="w-16 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                        <div className="w-16 h-20 bg-accent rounded-lg overflow-hidden flex-shrink-0">
                           {record.capturedImages?.front ? (
                             <img
                               src={record.capturedImages.front}
@@ -262,7 +316,7 @@ export default function HistoryPage() {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                               <ImageIcon className="w-6 h-6" />
                             </div>
                           )}
@@ -320,9 +374,9 @@ export default function HistoryPage() {
               ))}
 
               {/* ============================================================ */}
-              {/* Supabase 기록 (클라우드 동기화) */}
+              {/* 로그인 유저: Supabase 기록만 표시 */}
               {/* ============================================================ */}
-              {supabaseRecords.map((record) => (
+              {user && supabaseRecords.map((record) => (
                 <motion.div key={`supabase-${record.id}`} variants={itemVariants}>
                   <Card
                     onClick={() => handleViewSupabaseRecord(record)}
@@ -429,6 +483,6 @@ export default function HistoryPage() {
           )}
         </motion.div>
       </div>
-    </>
+    </SidebarLayout>
   );
 }

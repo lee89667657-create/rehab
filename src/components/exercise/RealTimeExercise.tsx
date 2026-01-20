@@ -35,10 +35,21 @@ import {
   saveExerciseResult,
 } from '@/lib/exerciseData';
 import { devRealtimeLog, devStateLog } from '@/lib/logger';
+import {
+  calculateCalibration,
+  calculateMedian,
+} from '@/lib/calibration';
 
 // ============================================================
 // 타입 정의
 // ============================================================
+
+/** 각도 설정 타입 */
+interface AngleSettings {
+  startAngle: number;
+  targetAngle: number;
+  repThreshold: number;
+}
 
 interface RealTimeExerciseProps {
   /** 수행할 운동 데이터 */
@@ -47,6 +58,8 @@ interface RealTimeExerciseProps {
   onComplete: (result: ExerciseResult) => void;
   /** 운동 취소 시 호출되는 콜백 */
   onCancel: () => void;
+  /** 각도 설정 (난이도/전문가 모드) */
+  angleSettings?: AngleSettings;
 }
 
 /** 반복 동작 상태 */
@@ -206,6 +219,7 @@ function getKneeAngle(landmarks: PoseLandmark[]): number | null {
  * - 무릎 들었을 때: 약 90~130도 (허벅지가 올라감)
  * @returns 더 작은 쪽 hip 각도 (도) 또는 null
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getHipAngle(landmarks: PoseLandmark[]): number | null {
   // 왼쪽: shoulder(11), hip(23), knee(25)
   const leftAngle = calculateAngle(
@@ -228,6 +242,35 @@ function getHipAngle(landmarks: PoseLandmark[]): number | null {
   return leftAngle ?? rightAngle;
 }
 
+/**
+ * 어깨 각도 계산 (팔 들어올리기용)
+ * hip-shoulder-wrist 세 점으로 팔이 몸통과 이루는 각도 계산
+ * - 팔 내렸을 때: 약 10~30도
+ * - 팔 올렸을 때: 약 150~180도
+ * @returns 더 큰 쪽 어깨 각도 (도) 또는 null
+ */
+function getShoulderAngle(landmarks: PoseLandmark[]): number | null {
+  // 왼쪽: hip(23), shoulder(11), wrist(15)
+  const leftAngle = calculateAngle(
+    landmarks[23],
+    landmarks[11],
+    landmarks[15]
+  );
+
+  // 오른쪽: hip(24), shoulder(12), wrist(16)
+  const rightAngle = calculateAngle(
+    landmarks[24],
+    landmarks[12],
+    landmarks[16]
+  );
+
+  // 둘 다 유효하면 더 큰 값 사용 (팔을 올릴수록 각도 커짐)
+  if (leftAngle !== null && rightAngle !== null) {
+    return Math.max(leftAngle, rightAngle);
+  }
+  return leftAngle ?? rightAngle;
+}
+
 // ============================================================
 // 메인 컴포넌트
 // ============================================================
@@ -236,6 +279,7 @@ export default function RealTimeExercise({
   exercise,
   onComplete,
   onCancel,
+  angleSettings,
 }: RealTimeExerciseProps) {
   // ========================================
   // Refs - MediaPipe 인스턴스 및 최신 상태 유지용
@@ -254,6 +298,14 @@ export default function RealTimeExercise({
   const currentRepRef = useRef(0);
   const currentSetRef = useRef(1);
   const lastCountTimeRef = useRef(0);
+
+  // 난이도 설정 적용 (전달받은 값 또는 기본값) - 추후 난이도 조절에 사용 예정
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const appliedSettings = angleSettings || {
+    startAngle: 170,
+    targetAngle: 110,
+    repThreshold: 140,
+  };
 
   // 운동 시작 시간
   const startTimeRef = useRef(Date.now());
@@ -287,6 +339,23 @@ export default function RealTimeExercise({
   const rightCountRef = useRef(0);                               // 오른쪽 완료 횟수
 
   // ========================================
+  // 스쿼트 전용 Refs (2단계 캘리브레이션)
+  // ========================================
+  // 1단계: 서있을 때 무릎 각도 측정
+  // 2단계: 스쿼트 자세 무릎 각도 측정
+  // → 사용자 컨디션에 맞는 임계값 자동 계산
+  const squatStandingAngleRef = useRef<number | null>(null);    // 서있을 때 무릎 각도
+  const squatDownAngleRef = useRef<number | null>(null);        // 스쿼트 자세 무릎 각도  
+  const squatStandingSamplesRef = useRef<number[]>([]);         // 서있는 자세 샘플
+  const squatDownSamplesRef = useRef<number[]>([]);             // 스쿼트 자세 샘플
+
+  // 하위 호환성을 위한 alias (레거시 코드 참조용)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const squatBaselineAngleRef = squatStandingAngleRef;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const squatAngleSamplesRef = squatStandingSamplesRef;
+
+  // ========================================
   // State - UI 렌더링용
   // ========================================
 
@@ -308,13 +377,17 @@ export default function RealTimeExercise({
   // ========================================
   // 초기화 단계 상태 (음성 타이밍 관리)
   // ========================================
-  // 플로우: loading → announcing → countdown → starting → done
+  // 일반 운동 플로우: loading → announcing → countdown → starting → done
+  // 스쿼트 플로우: loading → announcing → countdown → squat_announcing → squat_countdown → starting → done
+  // 
   // 1. loading: 카메라 로딩 중
   // 2. announcing: "기본 자세를 잡으세요" 음성 (3초 대기)
-  // 3. countdown: 3, 2, 1 카운트다운
-  // 4. starting: "운동을 시작합니다" 음성 (2초 대기)
-  // 5. done: 운동 시작
-  const [initPhase, setInitPhase] = useState<'loading' | 'announcing' | 'countdown' | 'starting' | 'done'>('loading');
+  // 3. countdown: 3, 2, 1 카운트다운 (서있는 자세 측정)
+  // 4. squat_announcing: [스쿼트만] "스쿼트 자세를 잡으세요" 음성 (3초 대기)
+  // 5. squat_countdown: [스쿼트만] 3, 2, 1 카운트다운 (스쿼트 자세 측정)
+  // 6. starting: "운동을 시작합니다" 음성 (2초 대기)
+  // 7. done: 운동 시작
+  const [initPhase, setInitPhase] = useState<'loading' | 'announcing' | 'countdown' | 'squat_announcing' | 'squat_countdown' | 'starting' | 'done'>('loading');
   const [readyCountdown, setReadyCountdown] = useState(3);
   const isCalibrationCompleteRef = useRef(false);  // 캘리브레이션 완료 여부
 
@@ -497,10 +570,19 @@ export default function RealTimeExercise({
   // ========================================
 
   /**
-   * 스쿼트 전용 각도 기반 감지
-   * - 서있을 때: 무릎 각도 > 150도
-   * - 스쿼트 시: 무릎 각도 < 120도
-   * - down → standing 전환 시 1회 카운트
+   * 스쿼트 전용 각도 기반 감지 (2단계 캘리브레이션 적용)
+   * 
+   * ## 2단계 캘리브레이션 방식 (교수님 방식)
+   * 1단계: 서있을 때 무릎 각도 측정 (예: 175°)
+   * 2단계: 스쿼트 자세 무릎 각도 측정 (예: 140°)
+   * 
+   * ## 임계값 계산
+   * - 스쿼트 임계값 = 스쿼트 각도 + 10° (예: 150°)
+   * - 복귀 임계값 = 서있는 각도 - 15° (예: 160°)
+   * 
+   * ## 상태 머신
+   * - ready/up → down: 무릎 각도 < 스쿼트 임계값
+   * - down → up: 무릎 각도 > 복귀 임계값 → 카운트
    */
   const detectSquat = useCallback((
     landmarks: PoseLandmark[]
@@ -520,20 +602,26 @@ export default function RealTimeExercise({
     const phase = repPhaseRef.current;
     const debounceFrames = 2;  // 빠른 동작 인식을 위해 2프레임으로 고정
 
-    // 스쿼트 임계값 (실측 기준: 서있을 때 170~178°, 스쿼트 시 143~152°)
-    const SQUAT_DOWN_THRESHOLD = 160;  // 이 각도 미만이면 스쿼트 상태
-    const STANDING_THRESHOLD = 168;     // 이 각도 초과이면 서있는 상태
+    // 2단계 캘리브레이션 값 (없으면 기본값)
+    const standingAngle = squatStandingAngleRef.current ?? 170;
+    const squattingAngle = squatDownAngleRef.current ?? 140;
+    
+    // 동적 임계값 계산 (사용자 컨디션에 맞춤)
+    const SQUAT_DOWN_THRESHOLD = squattingAngle + 10;  // 스쿼트 상태 (예: 140+10=150°)
+    const STANDING_THRESHOLD = standingAngle - 15;     // 복귀 상태 (예: 175-15=160°)
 
     // 디버그 로그 (실시간 - 기본 비활성화)
     devRealtimeLog(
       `[스쿼트] 무릎각도: ${kneeAngle.toFixed(1)}° | ` +
+      `서있음: ${standingAngle.toFixed(1)}° 스쿼트: ${squattingAngle.toFixed(1)}° | ` +
+      `스쿼트<${SQUAT_DOWN_THRESHOLD.toFixed(0)}° 복귀>${STANDING_THRESHOLD.toFixed(0)}° | ` +
       `연속: ${debounceCountRef.current}/${debounceFrames} | ` +
       `상태: ${phase}`
     );
 
     // 상태 머신
     if (phase === 'ready' || phase === 'up') {
-      // 스쿼트 자세로 전환: 무릎 각도 < 120도
+      // 스쿼트 자세로 전환: 무릎 각도 < 스쿼트 임계값
       if (kneeAngle < SQUAT_DOWN_THRESHOLD) {
         debounceCountRef.current++;
         if (debounceCountRef.current >= debounceFrames) {
@@ -546,7 +634,7 @@ export default function RealTimeExercise({
         debounceCountRef.current = 0;
       }
     } else if (phase === 'down') {
-      // 서있는 자세로 복귀: 무릎 각도 > 150도 → 카운트
+      // 서있는 자세로 복귀: 무릎 각도 > 복귀 임계값 → 카운트
       if (kneeAngle > STANDING_THRESHOLD) {
         debounceCountRef.current++;
         if (debounceCountRef.current >= debounceFrames &&
@@ -579,60 +667,69 @@ export default function RealTimeExercise({
   }, [exercise, speakRepCount]);
 
   // ========================================
-  // 무릎 들어올리기 각도 기반 감지
+  // 팔 들어올리기 (각도 기반) 감지
   // ========================================
 
   /**
-   * 무릎 들어올리기 전용 각도 기반 감지
-   * - 서있을 때: hip 각도 > 160도 (다리 펴짐)
-   * - 무릎 들었을 때: hip 각도 < 140도 (허벅지 올라감)
-   * - down → up 전환 시 1회 카운트
+   * arm-raise 전용 감지 로직 (각도 기반)
+   *
+   * ## 측정 방식
+   * - hip-shoulder-wrist 세 점으로 어깨 각도 측정
+   * - 팔 내렸을 때: 약 10~30°
+   * - 팔 올렸을 때: 약 150~180°
+   *
+   * ## 상태 머신
+   * - ready/up: 팔 내린 상태 → 각도 > targetAngle이면 down으로 전환
+   * - down: 팔 올린 상태 → 각도 < returnAngle이면 카운트
    */
-  const detectKneeLift = useCallback((
+  const detectArmRaise = useCallback((
     landmarks: PoseLandmark[]
   ) => {
     if (isPausedRef.current || isRestingRef.current) return;
     if (!isCalibrationCompleteRef.current) return;
 
-    // hip 각도 계산 (shoulder-hip-knee)
-    const hipAngle = getHipAngle(landmarks);
-    if (hipAngle === null) {
-      return;
-    }
+    // 어깨 각도 계산
+    const shoulderAngle = getShoulderAngle(landmarks);
+    if (shoulderAngle === null) return;
 
     const now = Date.now();
     const cooldown = exercise.countingCooldown ?? 500;
     const phase = repPhaseRef.current;
     const debounceFrames = 2;
 
-    // 무릎 들어올리기 임계값
-    const KNEE_UP_THRESHOLD = 140;    // 이 각도 미만이면 무릎 들린 상태
-    const STANDING_THRESHOLD = 160;   // 이 각도 초과이면 서있는 상태
+    // 각도 설정 (angleConfig 또는 기본값)
+    const config = exercise.angleConfig;
+    const startAngle = config?.startAngle ?? 30;    // 팔 내린 상태
+    const targetAngle = config?.targetAngle ?? 150; // 팔 올린 상태
 
-    // 디버그 로그 (실시간 - 기본 비활성화)
+    // 동적 임계값
+    const ARM_UP_THRESHOLD = targetAngle - 20;     // 팔 올림 인식 (130°)
+    const ARM_DOWN_THRESHOLD = startAngle + 70;    // 복귀 인식 (90°) - 팔을 어깨 아래로 내리면 인식
+
     devRealtimeLog(
-      `[무릎들기] hip각도: ${hipAngle.toFixed(1)}° | ` +
+      `[팔 들어올리기] 어깨각도: ${shoulderAngle.toFixed(1)}° | ` +
+      `올림>${ARM_UP_THRESHOLD.toFixed(0)}° 내림<${ARM_DOWN_THRESHOLD.toFixed(0)}° | ` +
       `연속: ${debounceCountRef.current}/${debounceFrames} | ` +
       `상태: ${phase}`
     );
 
     // 상태 머신
     if (phase === 'ready' || phase === 'up') {
-      // 무릎 들린 상태로 전환: hip 각도 < 140도
-      if (hipAngle < KNEE_UP_THRESHOLD) {
+      // 팔 올림 감지: 어깨 각도 > 임계값
+      if (shoulderAngle > ARM_UP_THRESHOLD) {
         debounceCountRef.current++;
         if (debounceCountRef.current >= debounceFrames) {
           repPhaseRef.current = 'down';
           debounceCountRef.current = 0;
-          setFeedback('좋아요! 천천히 내려놓으세요');
+          setFeedback('좋아요! 천천히 내리세요');
           setFeedbackType('success');
         }
       } else {
         debounceCountRef.current = 0;
       }
     } else if (phase === 'down') {
-      // 서있는 자세로 복귀: hip 각도 > 160도 → 카운트
-      if (hipAngle > STANDING_THRESHOLD) {
+      // 팔 내림 감지: 어깨 각도 < 임계값 → 카운트
+      if (shoulderAngle < ARM_DOWN_THRESHOLD) {
         debounceCountRef.current++;
         if (debounceCountRef.current >= debounceFrames &&
             now - lastCountTimeRef.current > cooldown) {
@@ -880,15 +977,15 @@ export default function RealTimeExercise({
     if (isPausedRef.current || isRestingRef.current) return;
     if (!isCalibrationCompleteRef.current) return;  // 캘리브레이션 완료 전에는 감지 안 함
 
-    // 스쿼트는 각도 기반 감지 사용
+    // 스쿼트는 각도 기반 감지 사용 (측면 촬영)
     if (exercise.id === 'squat') {
       detectSquat(landmarks as PoseLandmark[]);
       return;
     }
 
-    // 무릎 들어올리기는 각도 기반 감지 사용
-    if (exercise.id === 'knee-lift') {
-      detectKneeLift(landmarks as PoseLandmark[]);
+    // 팔 들어올리기는 각도 기반 감지 사용 (정면 촬영)
+    if (exercise.id === 'arm-raise') {
+      detectArmRaise(landmarks as PoseLandmark[]);
       return;
     }
 
@@ -1008,7 +1105,7 @@ export default function RealTimeExercise({
         debounceCountRef.current = 0;
       }
     }
-  }, [exercise, getMeasurementValue, speakRepCount, detectSquat, detectKneeLift, detectNeckSideStretch]);
+  }, [exercise, getMeasurementValue, speakRepCount, detectSquat, detectArmRaise, detectNeckSideStretch]);
 
   // ========================================
   // 세트 완료 처리
@@ -1113,6 +1210,14 @@ export default function RealTimeExercise({
             rightCountRef.current = 0;
           }
 
+          // 스쿼트 전용 상태 리셋 (2단계 캘리브레이션 값도 리셋)
+          if (exercise.id === 'squat') {
+            squatStandingAngleRef.current = null;
+            squatDownAngleRef.current = null;
+            squatStandingSamplesRef.current = [];
+            squatDownSamplesRef.current = [];
+          }
+
           // announcing 단계로 리셋
           setInitPhase('announcing');
 
@@ -1174,27 +1279,6 @@ export default function RealTimeExercise({
       } else {
         setShowJointWarning(false);
       }
-    } else if (exercise.id === 'knee-lift') {
-      // 무릎 들어올리기: shoulder, hip, knee 확인 (hip 각도 계산에 필요)
-      // 왼쪽: shoulder(11), hip(23), knee(25)
-      // 오른쪽: shoulder(12), hip(24), knee(26)
-      const leftShoulderVis = landmarks[11]?.visibility ?? 0;
-      const leftHipVis = landmarks[23]?.visibility ?? 0;
-      const leftKneeVis = landmarks[25]?.visibility ?? 0;
-      const rightShoulderVis = landmarks[12]?.visibility ?? 0;
-      const rightHipVis = landmarks[24]?.visibility ?? 0;
-      const rightKneeVis = landmarks[26]?.visibility ?? 0;
-
-      // 한쪽이라도 모든 관절이 보이면 OK
-      const leftVisible = leftShoulderVis > 0.5 && leftHipVis > 0.5 && leftKneeVis > 0.5;
-      const rightVisible = rightShoulderVis > 0.5 && rightHipVis > 0.5 && rightKneeVis > 0.5;
-
-      if (!leftVisible && !rightVisible) {
-        setShowJointWarning(true);
-        return;
-      } else {
-        setShowJointWarning(false);
-      }
     } else if (exercise.countingJoint === 'knee') {
       // 기타 knee 운동: 무릎만 확인
       const leftKnee = landmarks[25];
@@ -1229,6 +1313,23 @@ export default function RealTimeExercise({
         }
       }
 
+      // 스쿼트 전용: 1단계 캘리브레이션 (서있는 자세) 샘플 수집
+      if (exercise.id === 'squat' && initPhase === 'countdown') {
+        const kneeAngle = getKneeAngle(landmarks as PoseLandmark[]);
+        if (kneeAngle !== null) {
+          squatStandingSamplesRef.current.push(kneeAngle);
+        }
+      }
+
+      return; // 캘리브레이션 중에는 동작 감지 안 함
+    }
+
+    // 스쿼트 2단계 캘리브레이션 중 (squat_countdown) - 스쿼트 자세 샘플 수집
+    if (exercise.id === 'squat' && initPhase === 'squat_countdown' && !isPausedRef.current) {
+      const kneeAngle = getKneeAngle(landmarks as PoseLandmark[]);
+      if (kneeAngle !== null) {
+        squatDownSamplesRef.current.push(kneeAngle);
+      }
       return; // 캘리브레이션 중에는 동작 감지 안 함
     }
 
@@ -1273,29 +1374,149 @@ export default function RealTimeExercise({
         if (next <= 0) {
           clearInterval(timer);
 
-          // 캘리브레이션 완료: baseline 계산
+          // 캘리브레이션 완료: 중앙값 기반 baseline 계산 (개선됨)
           const samples = baselineSamplesRef.current;
-          if (samples.length > 0) {
-            const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
-            baselineRef.current = avg;
-            devStateLog('캘리브레이션', '완료', { baseline: avg.toFixed(3), samples: samples.length });
+          if (samples.length >= 5) {
+            // 중앙값 사용 (이상치 제거 효과)
+            const calibResult = calculateCalibration(samples);
+            baselineRef.current = calibResult.baseline;
+            devStateLog('캘리브레이션', '완료', { 
+              baseline: calibResult.baseline.toFixed(3), 
+              samples: calibResult.sampleCount,
+              stdDev: calibResult.standardDeviation.toFixed(4),
+              isValid: calibResult.isValid
+            });
+            
+            // 유효하지 않은 캘리브레이션 경고 (자세가 불안정했음)
+            if (!calibResult.isValid) {
+              devStateLog('캘리브레이션', '경고: 자세가 불안정했습니다');
+            }
+          } else if (samples.length > 0) {
+            // 샘플이 부족하면 있는 것만으로 중앙값 계산
+            const median = calculateMedian(samples);
+            baselineRef.current = median;
+            devStateLog('캘리브레이션', '샘플 부족 - 가용 데이터 사용', { 
+              baseline: median.toFixed(3), 
+              samples: samples.length 
+            });
           } else {
             // 샘플이 없으면 기본값 사용
             baselineRef.current = 0.5;
             devStateLog('캘리브레이션', '샘플 없음 - 기본값 사용');
           }
 
-          // neck-side-stretch 전용: nose.x baseline 계산
+          // neck-side-stretch 전용: nose.x baseline 계산 (중앙값 사용)
           if (exercise.id === 'neck-side-stretch') {
             const neckSamples = neckBaselineSamplesRef.current;
-            if (neckSamples.length > 0) {
-              const neckAvg = neckSamples.reduce((a, b) => a + b, 0) / neckSamples.length;
-              neckBaselineXRef.current = neckAvg;
-              devStateLog('목스트레칭 캘리브레이션', '완료', { baseline: neckAvg.toFixed(3), samples: neckSamples.length });
+            if (neckSamples.length >= 5) {
+              const neckMedian = calculateMedian(neckSamples);
+              neckBaselineXRef.current = neckMedian;
+              devStateLog('목스트레칭 캘리브레이션', '완료', { 
+                baseline: neckMedian.toFixed(3), 
+                samples: neckSamples.length 
+              });
+            } else if (neckSamples.length > 0) {
+              const neckMedian = calculateMedian(neckSamples);
+              neckBaselineXRef.current = neckMedian;
+              devStateLog('목스트레칭 캘리브레이션', '샘플 부족', { 
+                baseline: neckMedian.toFixed(3), 
+                samples: neckSamples.length 
+              });
             } else {
               neckBaselineXRef.current = 0.5;
               devStateLog('목스트레칭 캘리브레이션', '샘플 없음 - 기본값 사용');
             }
+          }
+
+          // 스쿼트 전용: 1단계(서있는 자세) 완료 → 2단계(스쿼트 자세)로 이동
+          if (exercise.id === 'squat') {
+            const squatSamples = squatStandingSamplesRef.current;
+            if (squatSamples.length >= 5) {
+              const standingAngle = calculateMedian(squatSamples);
+              squatStandingAngleRef.current = standingAngle;
+              devStateLog('스쿼트 캘리브레이션 1단계', '서있는 자세 측정 완료', { 
+                standingAngle: standingAngle.toFixed(1) + '°', 
+                samples: squatSamples.length
+              });
+            } else {
+              // 샘플이 없으면 기본값 사용 (170도)
+              squatStandingAngleRef.current = 170;
+              devStateLog('스쿼트 캘리브레이션 1단계', '샘플 부족 - 기본값 170° 사용');
+            }
+            
+            // 2단계로 이동 (샘플은 별도 배열 squatDownSamplesRef에 수집됨)
+            setInitPhase('squat_announcing');
+            return 0;
+          }
+
+          setInitPhase('starting');
+          return 0;
+        }
+        // "2", "1" 음성 재생
+        speak(String(next));
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [initPhase, speak]);
+
+  // squat_announcing 단계: "스쿼트 자세를 잡으세요" 음성 (스쿼트 전용)
+  useEffect(() => {
+    if (initPhase !== 'squat_announcing') return;
+
+    setFeedback('스쿼트 자세를 잡으세요');
+    setFeedbackType('info');
+    speak('스쿼트 자세를 잡으세요');
+
+    // 음성 후 3초 대기 → 카운트다운 시작
+    const timer = setTimeout(() => {
+      setInitPhase('squat_countdown');
+      setReadyCountdown(3);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [initPhase, speak]);
+
+  // squat_countdown 단계: 3, 2, 1 카운트다운 (스쿼트 자세 측정)
+  useEffect(() => {
+    if (initPhase !== 'squat_countdown') return;
+
+    setFeedback('스쿼트 자세 유지');
+    setFeedbackType('info');
+
+    // 즉시 "3" 음성 재생
+    speak('3');
+
+    const timer = setInterval(() => {
+      setReadyCountdown((prev) => {
+        const next = prev - 1;
+        if (next <= 0) {
+          clearInterval(timer);
+
+          // 스쿼트 자세 캘리브레이션 완료
+          const squatSamples = squatDownSamplesRef.current;
+          if (squatSamples.length >= 5) {
+            const squattingAngle = calculateMedian(squatSamples);
+            squatDownAngleRef.current = squattingAngle;
+            
+            const standingAngle = squatStandingAngleRef.current ?? 170;
+            
+            // 교수님 방식: 스쿼트 자세 기준으로 임계값 계산
+            const squatThreshold = squattingAngle + 10;  // 스쿼트 인식 임계값
+            const returnThreshold = standingAngle - 15;  // 복귀 인식 임계값
+            
+            devStateLog('스쿼트 캘리브레이션 2단계', '완료', { 
+              standingAngle: standingAngle.toFixed(1) + '°',
+              squattingAngle: squattingAngle.toFixed(1) + '°', 
+              samples: squatSamples.length,
+              squatThreshold: squatThreshold.toFixed(1) + '°',
+              returnThreshold: returnThreshold.toFixed(1) + '°'
+            });
+          } else {
+            // 샘플이 부족하면 기본값 사용
+            squatDownAngleRef.current = 140;
+            devStateLog('스쿼트 캘리브레이션 2단계', '샘플 부족 - 기본값 140° 사용');
           }
 
           setInitPhase('starting');
@@ -1554,7 +1775,7 @@ export default function RealTimeExercise({
                 variant="ghost"
                 size="icon"
                 onClick={handleCancel}
-                className="text-white hover:bg-white/20 h-8 w-8"
+                className="text-white hover:bg-card/20 h-8 w-8"
               >
                 <X className="w-5 h-5" />
               </Button>
@@ -1564,7 +1785,7 @@ export default function RealTimeExercise({
           {/* 포즈 미감지 경고 */}
           {!isLoading && !poseDetected && (
             <div className="absolute bottom-2 left-2 right-2">
-              <Card className="bg-yellow-500/90 border-0">
+              <Card className="bg-yellow-500/100/90 border-0">
                 <CardContent className="p-2 text-center">
                   <p className="text-white text-xs font-medium">
                     카메라에 전신이 보이도록 위치를 조정해주세요
@@ -1580,7 +1801,7 @@ export default function RealTimeExercise({
               <Card className="bg-orange-500/90 border-0">
                 <CardContent className="p-2 text-center">
                   <p className="text-white text-xs font-medium">
-                    {exercise.id === 'squat' || exercise.id === 'knee-lift'
+                    {exercise.id === 'squat'
                       ? '하체가 보이도록 카메라 위치를 조정해주세요'
                       : '무릎이 보이도록 카메라 위치를 조정해주세요'}
                   </p>
@@ -1599,12 +1820,12 @@ export default function RealTimeExercise({
           animate={{ opacity: 1, y: 0 }}
           className={`text-center py-3 px-6 rounded-2xl ${
             feedbackType === 'success'
-              ? 'bg-green-500'
+              ? 'bg-green-500/100'
               : feedbackType === 'warning'
                 ? 'bg-orange-500'
                 : feedbackType === 'error'
-                  ? 'bg-red-500'
-                  : 'bg-blue-500'
+                  ? 'bg-red-500/100'
+                  : 'bg-blue-500/100'
           }`}
         >
           {/* 카운트다운 중일 때는 큰 숫자 표시 */}
@@ -1622,12 +1843,12 @@ export default function RealTimeExercise({
       {/* 하단 정보 패널 */}
       <div className="bg-black/80 p-4 pb-8">
         {/* 세트/횟수 표시 */}
-        <Card className="mb-4 bg-white/95 backdrop-blur">
+        <Card className="mb-4 bg-card/95 backdrop-blur">
           <CardContent className="p-4">
             {isResting ? (
               // 휴식 중 표시
               <div className="text-center">
-                <p className="text-gray-500 text-sm mb-2">휴식 중</p>
+                <p className="text-muted-foreground text-sm mb-2">휴식 중</p>
                 <motion.p
                   key={restTime}
                   initial={{ scale: 1.2 }}
@@ -1635,7 +1856,7 @@ export default function RealTimeExercise({
                   className="text-5xl font-bold text-blue-600"
                 >
                   {restTime}
-                  <span className="text-2xl text-gray-400 ml-1">초</span>
+                  <span className="text-2xl text-muted-foreground ml-1">초</span>
                 </motion.p>
               </div>
             ) : (
@@ -1643,25 +1864,25 @@ export default function RealTimeExercise({
               <>
                 <div className="flex justify-around text-center mb-4">
                   <div>
-                    <p className="text-gray-500 text-xs mb-1">세트</p>
+                    <p className="text-muted-foreground text-xs mb-1">세트</p>
                     <p className="text-3xl font-bold">
                       {currentSet}
-                      <span className="text-gray-400 text-lg">/{exercise.sets}</span>
+                      <span className="text-muted-foreground text-lg">/{exercise.sets}</span>
                     </p>
                   </div>
-                  <div className="w-px bg-gray-200" />
+                  <div className="w-px bg-muted" />
                   <div>
-                    <p className="text-gray-500 text-xs mb-1">횟수</p>
+                    <p className="text-muted-foreground text-xs mb-1">횟수</p>
                     <p className="text-3xl font-bold">
                       {currentRep}
-                      <span className="text-gray-400 text-lg">/{exercise.reps}</span>
+                      <span className="text-muted-foreground text-lg">/{exercise.reps}</span>
                     </p>
                   </div>
                 </div>
 
                 {/* 진행률 바 */}
                 <div className="space-y-2">
-                  <div className="flex justify-between text-xs text-gray-500">
+                  <div className="flex justify-between text-xs text-muted-foreground">
                     <span>현재 세트 진행률</span>
                     <span>{Math.round(progressPercent)}%</span>
                   </div>
@@ -1674,14 +1895,14 @@ export default function RealTimeExercise({
 
         {/* 자세 포인트 표시 */}
         {!isResting && (
-          <Card className="mb-4 bg-white/10 border-white/20">
+          <Card className="mb-4 bg-card/10 border-white/20">
             <CardContent className="p-3">
               <p className="text-white/70 text-xs mb-2">자세 포인트</p>
               <div className="flex flex-wrap gap-2">
                 {exercise.keyPoints.map((point, idx) => (
                   <span
                     key={idx}
-                    className="text-xs text-white bg-white/20 px-2 py-1 rounded-full"
+                    className="text-xs text-white bg-card/20 px-2 py-1 rounded-full"
                   >
                     {point}
                   </span>
@@ -1695,7 +1916,7 @@ export default function RealTimeExercise({
         <div className="flex gap-3">
           <Button
             variant="outline"
-            className="flex-1 h-14 bg-white hover:bg-gray-100 border-0"
+            className="flex-1 h-14 bg-card hover:bg-accent border-0"
             onClick={togglePause}
           >
             {isPaused ? (
@@ -1714,7 +1935,7 @@ export default function RealTimeExercise({
           <Button
             variant="outline"
             size="icon"
-            className="h-14 w-14 bg-white hover:bg-gray-100 border-0"
+            className="h-14 w-14 bg-card hover:bg-accent border-0"
             onClick={toggleMute}
           >
             {isMuted ? (
@@ -1731,9 +1952,9 @@ export default function RealTimeExercise({
             <span>전체 진행률</span>
             <span>{Math.round(setProgressPercent)}%</span>
           </div>
-          <div className="h-1 bg-white/20 rounded-full overflow-hidden">
+          <div className="h-1 bg-card/20 rounded-full overflow-hidden">
             <motion.div
-              className="h-full bg-green-500"
+              className="h-full bg-green-500/100"
               animate={{ width: `${setProgressPercent}%` }}
               transition={{ duration: 0.3 }}
             />

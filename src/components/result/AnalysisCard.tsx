@@ -154,9 +154,9 @@ function JointAngleBar({ data, index }: JointAngleBarProps) {
   const targetPosition = ((data.target - data.min) / range) * 100;
 
   const statusColors = {
-    good: 'bg-emerald-500',
-    warning: 'bg-amber-500',
-    danger: 'bg-red-500',
+    good: 'bg-emerald-500/100',
+    warning: 'bg-amber-500/100',
+    danger: 'bg-red-500/100',
   };
 
   return (
@@ -272,7 +272,7 @@ function FeedbackSection({ items, isExpanded, onToggle }: FeedbackSectionProps) 
                   {positiveItems.map((item, idx) => (
                     <motion.div
                       key={idx}
-                      className="p-3 bg-emerald-50 rounded-xl border border-emerald-100"
+                      className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/30"
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.1 }}
@@ -296,7 +296,7 @@ function FeedbackSection({ items, isExpanded, onToggle }: FeedbackSectionProps) 
                   {improvementItems.map((item, idx) => (
                     <motion.div
                       key={idx}
-                      className="p-3 bg-amber-50 rounded-xl border border-amber-100"
+                      className="p-3 bg-amber-500/10 rounded-xl border border-amber-100"
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.1 + 0.2 }}

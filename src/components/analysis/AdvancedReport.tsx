@@ -19,8 +19,9 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+// ChevronDown, motion, AnimatePresence - 추후 더보기 기능에 사용 예정
+// import { ChevronDown } from 'lucide-react';
+// import { motion, AnimatePresence } from 'framer-motion';
 import {
   JointAngles,
   ROMResult,
@@ -51,6 +52,7 @@ interface JointRange {
 }
 
 const JOINT_RANGES: Record<string, JointRange> = {
+  neck: { min: 0, max: 30, normalMin: 0, normalMax: 10, name: '목 전방 각도', unit: '°' },
   trunk: { min: 0, max: 30, normalMin: 0, normalMax: 15, name: '몸통 기울기', unit: '°' },
   shoulder: { min: 0, max: 60, normalMin: 10, normalMax: 45, name: '어깨', unit: '°' },
   hip: { min: 140, max: 180, normalMin: 160, normalMax: 180, name: '고관절', unit: '°' },
@@ -86,14 +88,16 @@ const getCombinedStatus = (leftValue: number, rightValue: number, range: JointRa
 const getStatusColors = (status: Status) => {
   switch (status) {
     case 'normal':
-      return { marker: 'bg-green-500', text: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' };
+      return { marker: 'bg-green-500/100', text: 'text-green-600', bg: 'bg-green-500/10', border: 'border-green-200' };
     case 'warning':
-      return { marker: 'bg-yellow-500', text: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' };
+      return { marker: 'bg-yellow-500/100', text: 'text-yellow-600', bg: 'bg-yellow-500/10', border: 'border-yellow-200' };
     case 'danger':
-      return { marker: 'bg-red-500', text: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' };
+      return { marker: 'bg-red-500/100', text: 'text-red-600', bg: 'bg-red-500/10', border: 'border-red-200' };
   }
 };
 
+// 추후 사용 예정 함수들
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const getStatusText = (status: Status): string => {
   switch (status) {
     case 'normal': return '정상';
@@ -102,11 +106,13 @@ const getStatusText = (status: Status): string => {
   }
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const calculateMarkerPosition = (value: number, range: JointRange): number => {
   const percent = ((value - range.min) / (range.max - range.min)) * 100;
   return Math.min(100, Math.max(0, percent));
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const calculateNormalRangePosition = (range: JointRange) => {
   const start = ((range.normalMin - range.min) / (range.max - range.min)) * 100;
   const end = ((range.normalMax - range.min) / (range.max - range.min)) * 100;
@@ -163,13 +169,13 @@ function JointCard({ label, range, value, leftValue, rightValue }: JointCardProp
     : `${value}${range.unit}`;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 min-h-[140px] flex flex-col justify-between">
+    <div className="bg-card border border-border rounded-xl p-4 min-h-[140px] flex flex-col justify-between">
       {/* 상단: 레이블 + 값 */}
       <div className="flex justify-between items-start">
         <div>
-          <h4 className="font-semibold text-gray-800 text-sm">{label}</h4>
+          <h4 className="font-semibold text-foreground text-sm">{label}</h4>
           {isPaired && (
-            <span className="text-[11px] text-gray-400">좌 / 우</span>
+            <span className="text-[11px] text-muted-foreground">좌 / 우</span>
           )}
         </div>
         <span className={`text-lg font-bold ${colors.text}`}>
@@ -195,7 +201,7 @@ function JointCard({ label, range, value, leftValue, rightValue }: JointCardProp
         </div>
 
         {/* 구간 라벨 */}
-        <div className="flex text-[10px] text-gray-400 mt-1">
+        <div className="flex text-[10px] text-muted-foreground mt-1">
           <span style={{ width: '20%' }} className="text-center">위험</span>
           <span style={{ width: '30%' }} className="text-center">주의</span>
           <span style={{ width: '50%' }} className="text-center">정상</span>
@@ -246,13 +252,13 @@ export function BalanceCard({ label, percentDiff, dominantSide }: BalanceCardPro
     : dominantSide === 'left' ? '(좌측 우세)' : '(우측 우세)';
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 min-h-[140px] flex flex-col justify-between">
+    <div className="bg-card border border-border rounded-xl p-4 min-h-[140px] flex flex-col justify-between">
       {/* 상단: 레이블 + 값 */}
       <div className="flex justify-between items-start">
         <div>
-          <h4 className="font-semibold text-gray-800 text-sm">{label} 균형</h4>
+          <h4 className="font-semibold text-foreground text-sm">{label} 균형</h4>
           {sideText && (
-            <span className="text-[11px] text-gray-400">{sideText}</span>
+            <span className="text-[11px] text-muted-foreground">{sideText}</span>
           )}
         </div>
         <span className={`text-lg font-bold ${colors.text}`}>
@@ -278,7 +284,7 @@ export function BalanceCard({ label, percentDiff, dominantSide }: BalanceCardPro
         </div>
 
         {/* 구간 라벨 */}
-        <div className="flex text-[10px] text-gray-400 mt-1">
+        <div className="flex text-[10px] text-muted-foreground mt-1">
           <span style={{ width: '20%' }} className="text-center">균형</span>
           <span style={{ width: '30%' }} className="text-center">약간</span>
           <span style={{ width: '50%' }} className="text-center">불균형</span>
@@ -300,9 +306,11 @@ export function BalanceCard({ label, percentDiff, dominantSide }: BalanceCardPro
 export default function AdvancedReport({
   jointAngles,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  romResults: _romResults,
+  romResults,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   asymmetryResults,
 }: Props) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showMore, setShowMore] = useState(false);
 
   if (!jointAngles) {
@@ -314,10 +322,17 @@ export default function AdvancedReport({
       {/* 핵심 항목 카드 (2열 그리드) */}
       <div className="grid grid-cols-2 gap-4">
         <JointCard
+          label="목 전방 각도"
+          value={jointAngles.neck}
+          range={JOINT_RANGES.neck}
+        />
+        <JointCard
           label="몸통 기울기"
           value={jointAngles.trunk}
           range={JOINT_RANGES.trunk}
         />
+      </div>
+      <div className="grid grid-cols-1 gap-4">
         <JointCard
           label="어깨"
           leftValue={jointAngles.shoulderLeft}
@@ -327,15 +342,15 @@ export default function AdvancedReport({
       </div>
 
       {/* [MVP 제외] 하체 관절 상세 (고관절, 무릎) - 추후 활성화 예정
-      <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+      <div className="border border-border rounded-xl overflow-hidden bg-card">
         <button
           onClick={() => setShowMore(!showMore)}
-          className="w-full px-4 py-3 flex justify-between items-center hover:bg-gray-50 transition-colors"
+          className="w-full px-4 py-3 flex justify-between items-center hover:bg-muted transition-colors"
         >
-          <span className="text-sm text-gray-600 font-medium">
+          <span className="text-sm text-muted-foreground font-medium">
             하체 관절 상세 (고관절, 무릎)
           </span>
-          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${showMore ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${showMore ? 'rotate-180' : ''}`} />
         </button>
 
         <AnimatePresence>
@@ -345,7 +360,7 @@ export default function AdvancedReport({
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="border-t border-gray-100"
+              className="border-t border-border"
             >
               <div className="p-4 grid grid-cols-2 gap-4">
                 <JointCard
