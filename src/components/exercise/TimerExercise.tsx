@@ -21,6 +21,7 @@ import { Play, Pause, X, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import TimerBar from './TimerBar';
 import {
   type TimerExercise as TimerExerciseType,
   type ExerciseResult,
@@ -617,92 +618,85 @@ export default function TimerExercise({
     (holdProgressPercent / exercise.sets);
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col">
-      {/* 카메라 영역 - 고정 높이로 휴식 중에도 비율 유지 */}
-      <div className="h-[50vh] flex items-center justify-center shrink-0">
-        <div className="relative h-full aspect-[9/16] overflow-hidden rounded-lg">
-          <video
-            ref={videoRef}
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ transform: 'scaleX(-1)' }}
-            playsInline
-            muted
-          />
+    <div className="fixed inset-0 bg-black z-50 flex flex-row">
+      {/* ========================================
+          왼쪽 영역: 카메라 + 피드백 배너
+          ======================================== */}
+      <div className="w-2/5 flex flex-col p-4">
+        {/* 카메라 영역 */}
+        <div className="flex-1 flex items-center justify-center">
+          <div className="relative w-full h-full max-w-sm aspect-[9/16] overflow-hidden rounded-lg">
+            <video
+              ref={videoRef}
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ transform: 'scaleX(-1)' }}
+              playsInline
+              muted
+            />
 
-          <canvas
-            ref={canvasRef}
-            width={720}
-            height={1280}
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ transform: 'scaleX(-1)' }}
-          />
+            <canvas
+              ref={canvasRef}
+              width={720}
+              height={1280}
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ transform: 'scaleX(-1)' }}
+            />
 
-          {/* 로딩 오버레이 */}
-          <AnimatePresence>
-            {isLoading && (
-              <motion.div
-                initial={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-black/80 flex items-center justify-center"
-              >
-                <div className="text-white text-center">
-                  <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                  <p className="text-lg font-medium">카메라 준비 중...</p>
+            {/* 로딩 오버레이 */}
+            <AnimatePresence>
+              {isLoading && (
+                <motion.div
+                  initial={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 bg-black/80 flex items-center justify-center"
+                >
+                  <div className="text-white text-center">
+                    <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-lg font-medium">카메라 준비 중...</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* 상단 헤더 */}
+            <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/70 to-transparent">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="text-white text-lg font-bold">{exercise.name}</h2>
+                  <p className="text-white/70 text-xs">{exercise.description}</p>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* 상단 헤더 */}
-          <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/70 to-transparent">
-            <div className="flex justify-between items-start">
-              <div>
-                <h2 className="text-white text-lg font-bold">{exercise.name}</h2>
-                <p className="text-white/70 text-xs">{exercise.description}</p>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleCancel}
+                  className="text-white hover:bg-card/20 h-8 w-8"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleCancel}
-                className="text-white hover:bg-card/20 h-8 w-8"
-              >
-                <X className="w-5 h-5" />
-              </Button>
             </div>
+
+            {/* 포즈 미감지 경고 */}
+            {!isLoading && !poseDetected && (
+              <div className="absolute bottom-2 left-2 right-2">
+                <Card className="bg-yellow-500/90 border-0">
+                  <CardContent className="p-2 text-center">
+                    <p className="text-white text-xs font-medium">
+                      카메라에 전신이 보이도록 위치를 조정해주세요
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </div>
-
-          {/* 포즈 미감지 경고 */}
-          {!isLoading && !poseDetected && (
-            <div className="absolute bottom-2 left-2 right-2">
-              <Card className="bg-yellow-500/100/90 border-0">
-                <CardContent className="p-2 text-center">
-                  <p className="text-white text-xs font-medium">
-                    카메라에 전신이 보이도록 위치를 조정해주세요
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
         </div>
-      </div>
 
-      {/* 피드백 배너 (카메라 아래, 카드 위) */}
-      <div className="px-4 py-2">
-        <motion.div
-          key={feedback + (initPhase === 'countdown' ? readyCountdown : '')}
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={`text-center py-3 px-6 rounded-2xl ${
-            feedbackType === 'success'
-              ? 'bg-green-500/100'
-              : feedbackType === 'warning'
-                ? 'bg-orange-500'
-                : feedbackType === 'error'
-                  ? 'bg-red-500/100'
-                  : 'bg-blue-500/100'
-          }`}
-        >
-          {/* 카운트다운 중일 때는 큰 숫자 표시 */}
+        {/* 피드백 배너 */}
+        <div className={`mt-4 py-3 px-6 rounded-xl text-center ${
+          feedbackType === 'success' ? 'bg-green-500' :
+          feedbackType === 'warning' ? 'bg-orange-500' :
+          feedbackType === 'error' ? 'bg-red-500' : 'bg-blue-500'
+        }`}>
           {initPhase === 'countdown' ? (
             <div className="flex items-center justify-center gap-3">
               <span className="text-white text-lg">{feedback}</span>
@@ -711,57 +705,56 @@ export default function TimerExercise({
           ) : (
             <p className="text-white text-lg font-bold">{feedback}</p>
           )}
-        </motion.div>
+        </div>
       </div>
 
-      {/* 하단 정보 패널 */}
-      <div className="bg-black/80 p-4 pb-8">
+      {/* ========================================
+          오른쪽 영역: 정보 패널
+          ======================================== */}
+      <div className="w-3/5 bg-gray-900 p-6 flex flex-col overflow-y-auto">
         {/* 세트/타이머 표시 */}
-        <Card className="mb-4 bg-card/95 backdrop-blur">
+        <Card className="mb-4 bg-gray-800 border-gray-700">
           <CardContent className="p-4">
             {phase === 'resting' ? (
-              // 휴식 중 표시
               <div className="text-center">
-                <p className="text-muted-foreground text-sm mb-2">휴식 중</p>
+                <p className="text-gray-400 text-sm mb-2">휴식 중</p>
                 <motion.p
                   key={restTimeRemaining}
                   initial={{ scale: 1.2 }}
                   animate={{ scale: 1 }}
-                  className="text-5xl font-bold text-blue-600"
+                  className="text-5xl font-bold text-blue-400"
                 >
                   {restTimeRemaining}
-                  <span className="text-2xl text-muted-foreground ml-1">초</span>
+                  <span className="text-2xl text-gray-500 ml-1">초</span>
                 </motion.p>
               </div>
             ) : (
-              // 운동 중 표시
               <>
                 <div className="flex justify-around text-center mb-4">
                   <div>
-                    <p className="text-muted-foreground text-xs mb-1">세트</p>
-                    <p className="text-3xl font-bold">
+                    <p className="text-gray-400 text-xs mb-1">세트</p>
+                    <p className="text-3xl font-bold text-white">
                       {currentSet}
-                      <span className="text-muted-foreground text-lg">/{exercise.sets}</span>
+                      <span className="text-gray-500 text-lg">/{exercise.sets}</span>
                     </p>
                   </div>
-                  <div className="w-px bg-muted" />
+                  <div className="w-px bg-gray-700" />
                   <div>
-                    <p className="text-muted-foreground text-xs mb-1">남은 시간</p>
+                    <p className="text-gray-400 text-xs mb-1">남은 시간</p>
                     <motion.p
                       key={timeRemaining}
                       initial={{ scale: 1.1 }}
                       animate={{ scale: 1 }}
-                      className={`text-3xl font-bold ${phase === 'holding' ? 'text-green-600' : 'text-gray-900'}`}
+                      className={`text-3xl font-bold ${phase === 'holding' ? 'text-green-400' : 'text-white'}`}
                     >
                       {phase === 'holding' ? timeRemaining : exercise.holdTime}
-                      <span className="text-muted-foreground text-lg">초</span>
+                      <span className="text-gray-500 text-lg">초</span>
                     </motion.p>
                   </div>
                 </div>
 
-                {/* 진행률 바 */}
                 <div className="space-y-2">
-                  <div className="flex justify-between text-xs text-muted-foreground">
+                  <div className="flex justify-between text-xs text-gray-400">
                     <span>현재 세트 진행률</span>
                     <span>{Math.round(holdProgressPercent)}%</span>
                   </div>
@@ -772,16 +765,29 @@ export default function TimerExercise({
           </CardContent>
         </Card>
 
+        {/* TimerBar - 타이머 시각화 */}
+        {phase !== 'resting' && (
+          <Card className="mb-4 bg-gray-800 border-gray-700">
+            <CardContent className="p-4">
+              <TimerBar
+                currentTime={timeRemaining}
+                totalTime={exercise.holdTime}
+                label="운동 시간"
+              />
+            </CardContent>
+          </Card>
+        )}
+
         {/* 자세 포인트 표시 */}
         {phase !== 'resting' && (
-          <Card className="mb-4 bg-card/10 border-white/20">
+          <Card className="mb-4 bg-gray-800 border-gray-700">
             <CardContent className="p-3">
-              <p className="text-white/70 text-xs mb-2">자세 포인트</p>
+              <p className="text-gray-400 text-xs mb-2">자세 포인트</p>
               <div className="flex flex-wrap gap-2">
                 {exercise.keyPoints.map((point, idx) => (
                   <span
                     key={idx}
-                    className="text-xs text-white bg-card/20 px-2 py-1 rounded-full"
+                    className="text-xs text-white bg-gray-700 px-2 py-1 rounded-full"
                   >
                     {point}
                   </span>
@@ -792,10 +798,10 @@ export default function TimerExercise({
         )}
 
         {/* 컨트롤 버튼 */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 mt-auto">
           <Button
             variant="outline"
-            className="flex-1 h-14 bg-card hover:bg-accent border-0"
+            className="flex-1 h-14 bg-gray-800 hover:bg-gray-700 border-gray-600 text-white"
             onClick={togglePause}
             disabled={phase === 'ready'}
           >
@@ -815,7 +821,7 @@ export default function TimerExercise({
           <Button
             variant="outline"
             size="icon"
-            className="h-14 w-14 bg-card hover:bg-accent border-0"
+            className="h-14 w-14 bg-gray-800 hover:bg-gray-700 border-gray-600 text-white"
             onClick={toggleMute}
           >
             {isMuted ? (
@@ -828,13 +834,13 @@ export default function TimerExercise({
 
         {/* 전체 진행률 */}
         <div className="mt-4">
-          <div className="flex justify-between text-xs text-white/60 mb-1">
+          <div className="flex justify-between text-xs text-gray-400 mb-1">
             <span>전체 진행률</span>
             <span>{Math.round(setProgressPercent)}%</span>
           </div>
-          <div className="h-1 bg-card/20 rounded-full overflow-hidden">
+          <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
             <motion.div
-              className="h-full bg-green-500/100"
+              className="h-full bg-green-500"
               animate={{ width: `${setProgressPercent}%` }}
               transition={{ duration: 0.3 }}
             />
