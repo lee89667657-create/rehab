@@ -295,6 +295,13 @@ export default function AnalyzePage() {
   const [isCameraActive] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false); // 모드 전환 중
+
+  // 자동 촬영 모드
+  const [isAutoMode, setIsAutoMode] = useState(true);
+  const [poseReadyTime, setPoseReadyTime] = useState(0);
+  const poseReadyTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoTriggerRef = useRef(false); // 자동 촬영 트리거 방지
 
   // 타이머 ref (클린업용)
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -313,13 +320,83 @@ export default function AnalyzePage() {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    if (poseReadyTimerRef.current) {
+      clearTimeout(poseReadyTimerRef.current);
+      poseReadyTimerRef.current = null;
+    }
     router.back();
   };
+
+  // 음성 피드백 함수
+  const speak = useCallback((text: string) => {
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ko-KR';
+    utterance.rate = 1.0;
+    speechSynthesis.speak(utterance);
+  }, []);
+
+  // 자동 촬영 트리거 함수
+  const triggerAutoCapture = useCallback(() => {
+    if (autoTriggerRef.current || isCapturing || countdown !== null) return;
+    autoTriggerRef.current = true;
+
+    speak('자세가 맞습니다. 3초 후 촬영합니다.');
+
+    // 1초 대기 후 촬영 시작
+    setTimeout(() => {
+      if (!isCapturing && countdown === null) {
+        setIsCapturing(true);
+        setCountdown(3);
+
+        // 기존 타이머 정리
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+
+        // 1초마다 카운트다운
+        timerRef.current = setInterval(() => {
+          setCountdown((prev) => {
+            if (prev === null || prev <= 1) {
+              if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+              }
+              if (prev === 1) {
+                setTimeout(() => performCapture(), 100);
+              }
+              return prev === 1 ? 0 : prev;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      }
+    }, 1000);
+  }, [isCapturing, countdown, speak]);
 
   const handlePoseDetected = useCallback((landmarks: Landmark[]) => {
     setCurrentLandmarks(landmarks);
     landmarksRef.current = landmarks;
-  }, []);
+
+    // 자동 모드일 때 전신 감지 시간 추적 (전환 중에는 비활성화)
+    if (isAutoMode && !isCapturing && countdown === null && !autoTriggerRef.current && !isTransitioning) {
+      const isReady = checkFullBodyVisible(landmarks);
+
+      if (isReady) {
+        setPoseReadyTime((prev) => {
+          const newTime = prev + 1;
+          // 약 2초(60프레임 정도) 유지되면 자동 촬영
+          if (newTime >= 60) {
+            triggerAutoCapture();
+            return 0;
+          }
+          return newTime;
+        });
+      } else {
+        setPoseReadyTime(0);
+      }
+    }
+  }, [isAutoMode, isCapturing, countdown, triggerAutoCapture, isTransitioning]);
 
   // 촬영 실행
   const performCapture = useCallback(() => {
@@ -351,7 +428,19 @@ export default function AnalyzePage() {
     setIsCapturing(false);
 
     if (currentModeIndex < CAPTURE_MODES.length - 1) {
-      setCurrentModeIndex(currentModeIndex + 1);
+      // 정면 → 측면 전환 시: 자동 촬영 리셋 + 딜레이
+      autoTriggerRef.current = false;
+      setPoseReadyTime(0);
+      setIsTransitioning(true);
+
+      // 측면 촬영 안내 음성
+      speak('정면 촬영 완료. 측면으로 돌아서 주세요.');
+
+      // 3초 딜레이 후 모드 전환 (사용자가 돌아설 시간)
+      setTimeout(() => {
+        setCurrentModeIndex(currentModeIndex + 1);
+        setIsTransitioning(false);
+      }, 3000);
     } else {
       setIsAnalyzing(true);
 
@@ -524,7 +613,7 @@ export default function AnalyzePage() {
     }
   }, [currentMode.mode, capturedData, currentModeIndex, setAnalysisResult, setJointAngles, setLandmarks, setCapturedImage, router]);
 
-  // 촬영 시작 (3초 카운트다운)
+  // 촬영 시작 (3초 카운트다운) - 수동 모드용
   const handleCaptureStart = () => {
     if (isCapturing || countdown !== null) return;
 
@@ -533,6 +622,7 @@ export default function AnalyzePage() {
       return;
     }
 
+    speak('촬영을 시작합니다.');
     setIsCapturing(true);
     setCountdown(3);
 
@@ -567,8 +657,24 @@ export default function AnalyzePage() {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      if (poseReadyTimerRef.current) {
+        clearTimeout(poseReadyTimerRef.current);
+      }
+      speechSynthesis.cancel();
     };
   }, []);
+
+  // 촬영 완료 후 자동 트리거 리셋
+  useEffect(() => {
+    if (!isCapturing && countdown === null) {
+      // 촬영이 완료되면 1초 후 자동 트리거 리셋
+      const resetTimer = setTimeout(() => {
+        autoTriggerRef.current = false;
+        setPoseReadyTime(0);
+      }, 1000);
+      return () => clearTimeout(resetTimer);
+    }
+  }, [isCapturing, countdown]);
 
   const handleModeSelect = (index: number) => {
     if (countdown !== null || isCapturing) return;
@@ -652,17 +758,35 @@ export default function AnalyzePage() {
 
           {/* 안내 메시지 */}
           <motion.div
-            key={currentMode.guide}
+            key={currentMode.guide + isAutoMode}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="text-center px-6 pb-4 relative"
           >
             <p className="text-white/90 text-base font-semibold">
-              실루엣에 맞춰 서주세요
+              {isAutoMode ? '가이드라인에 맞춰 서세요' : '실루엣에 맞춰 서주세요'}
             </p>
             <p className="text-white/60 text-sm mt-1">
-              {currentMode.guide}
+              {isAutoMode
+                ? '자세가 맞으면 자동으로 촬영됩니다'
+                : currentMode.guide}
             </p>
+            {/* 자동 모드: 자세 준비 진행률 */}
+            {isAutoMode && isFullBodyVisible && poseReadyTime > 0 && !isCapturing && (
+              <div className="mt-2">
+                <div className="w-32 h-1.5 bg-white/20 rounded-full mx-auto overflow-hidden">
+                  <motion.div
+                    className="h-full bg-emerald-400 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(100, (poseReadyTime / 60) * 100)}%` }}
+                    transition={{ duration: 0.1 }}
+                  />
+                </div>
+                <p className="text-emerald-400 text-xs mt-1">
+                  자세 유지 중... {Math.round((poseReadyTime / 60) * 100)}%
+                </p>
+              </div>
+            )}
           </motion.div>
         </div>
 
@@ -764,6 +888,55 @@ export default function AnalyzePage() {
         </AnimatePresence>
 
         {/* ============================================================
+            모드 전환 오버레이 (정면 → 측면)
+            ============================================================ */}
+        <AnimatePresence>
+          {isTransitioning && (
+            <motion.div
+              className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-40"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <div className="text-center">
+                <motion.div
+                  initial={{ rotate: 0 }}
+                  animate={{ rotate: 90 }}
+                  transition={{ duration: 1, ease: 'easeInOut' }}
+                  className="w-20 h-20 mx-auto mb-6"
+                >
+                  <svg viewBox="0 0 100 100" fill="none" className="w-full h-full">
+                    <circle cx="50" cy="30" r="12" stroke="white" strokeWidth="3" />
+                    <line x1="50" y1="42" x2="50" y2="70" stroke="white" strokeWidth="3" />
+                    <line x1="50" y1="50" x2="30" y2="65" stroke="white" strokeWidth="3" />
+                    <line x1="50" y1="50" x2="70" y2="65" stroke="white" strokeWidth="3" />
+                    <line x1="50" y1="70" x2="35" y2="95" stroke="white" strokeWidth="3" />
+                    <line x1="50" y1="70" x2="65" y2="95" stroke="white" strokeWidth="3" />
+                  </svg>
+                </motion.div>
+                <p className="text-white text-xl font-bold mb-2">측면으로 돌아주세요</p>
+                <p className="text-white/60 text-sm">옆으로 돌아서 측면을 보여주세요</p>
+                <motion.div
+                  className="mt-4 flex justify-center gap-1"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                >
+                  {[0, 1, 2].map((i) => (
+                    <motion.div
+                      key={i}
+                      className="w-2 h-2 bg-blue-500 rounded-full"
+                      animate={{ opacity: [0.3, 1, 0.3] }}
+                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.3 }}
+                    />
+                  ))}
+                </motion.div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ============================================================
             분석 중 오버레이 - 삼성 스타일
             ============================================================ */}
         <AnimatePresence>
@@ -794,6 +967,28 @@ export default function AnalyzePage() {
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent h-56" />
 
           <div className="relative pb-safe px-4 pt-4">
+            {/* 자동/수동 모드 토글 */}
+            <div className="flex justify-center mb-4">
+              <motion.button
+                onClick={() => {
+                  setIsAutoMode(!isAutoMode);
+                  setPoseReadyTime(0);
+                  autoTriggerRef.current = false;
+                }}
+                whileTap={{ scale: 0.95 }}
+                className={`
+                  px-4 py-2 rounded-xl text-sm font-semibold
+                  transition-all duration-300
+                  ${isAutoMode
+                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+                    : 'bg-gray-600 text-white/70 border border-white/10'
+                  }
+                `}
+              >
+                {isAutoMode ? '🤖 자동 촬영 ON' : '✋ 수동 촬영'}
+              </motion.button>
+            </div>
+
             {/* 모드 선택 탭 - 삼성 스타일 */}
             <div className="flex justify-center gap-2 mb-6">
               {CAPTURE_MODES.map((mode, index) => {
