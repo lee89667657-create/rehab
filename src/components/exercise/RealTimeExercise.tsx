@@ -39,6 +39,8 @@ import {
   calculateCalibration,
   calculateMedian,
 } from '@/lib/calibration';
+import { AngleSmoother } from '@/lib/smoothing';
+import ROMBar from './ROMBar';
 
 // ============================================================
 // 타입 정의
@@ -188,9 +190,11 @@ function calculateAngle(
 
 /**
  * 좌/우 무릎 각도 중 더 작은 값 반환 (스쿼트 감지에 유리)
+ * @param landmarks - MediaPipe 랜드마크 배열
+ * @param smoother - 각도 스무딩 인스턴스 (선택)
  * @returns 무릎 각도 (도) 또는 null
  */
-function getKneeAngle(landmarks: PoseLandmark[]): number | null {
+function getKneeAngle(landmarks: PoseLandmark[], smoother?: AngleSmoother): number | null {
   // 왼쪽: hip(23), knee(25), ankle(27)
   const leftAngle = calculateAngle(
     landmarks[23],
@@ -206,10 +210,18 @@ function getKneeAngle(landmarks: PoseLandmark[]): number | null {
   );
 
   // 둘 다 유효하면 더 작은 값 사용 (스쿼트 인식에 유리)
+  let rawAngle: number | null = null;
   if (leftAngle !== null && rightAngle !== null) {
-    return Math.min(leftAngle, rightAngle);
+    rawAngle = Math.min(leftAngle, rightAngle);
+  } else {
+    rawAngle = leftAngle ?? rightAngle;
   }
-  return leftAngle ?? rightAngle;
+
+  // 스무딩 적용
+  if (smoother) {
+    return smoother.smooth('knee', rawAngle);
+  }
+  return rawAngle;
 }
 
 /**
@@ -247,9 +259,11 @@ function getHipAngle(landmarks: PoseLandmark[]): number | null {
  * hip-shoulder-wrist 세 점으로 팔이 몸통과 이루는 각도 계산
  * - 팔 내렸을 때: 약 10~30도
  * - 팔 올렸을 때: 약 150~180도
+ * @param landmarks - MediaPipe 랜드마크 배열
+ * @param smoother - 각도 스무딩 인스턴스 (선택)
  * @returns 더 큰 쪽 어깨 각도 (도) 또는 null
  */
-function getShoulderAngle(landmarks: PoseLandmark[]): number | null {
+function getShoulderAngle(landmarks: PoseLandmark[], smoother?: AngleSmoother): number | null {
   // 왼쪽: hip(23), shoulder(11), wrist(15)
   const leftAngle = calculateAngle(
     landmarks[23],
@@ -265,10 +279,18 @@ function getShoulderAngle(landmarks: PoseLandmark[]): number | null {
   );
 
   // 둘 다 유효하면 더 큰 값 사용 (팔을 올릴수록 각도 커짐)
+  let rawAngle: number | null = null;
   if (leftAngle !== null && rightAngle !== null) {
-    return Math.max(leftAngle, rightAngle);
+    rawAngle = Math.max(leftAngle, rightAngle);
+  } else {
+    rawAngle = leftAngle ?? rightAngle;
   }
-  return leftAngle ?? rightAngle;
+
+  // 스무딩 적용
+  if (smoother) {
+    return smoother.smooth('shoulder', rawAngle);
+  }
+  return rawAngle;
 }
 
 // ============================================================
@@ -290,6 +312,7 @@ export default function RealTimeExercise({
   const poseRef = useRef<PoseInstance | null>(null);
   const cameraRef = useRef<CameraInstance | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const angleSmootherRef = useRef<AngleSmoother>(new AngleSmoother());
 
   // React state stale 문제 방지를 위한 refs
   const isPausedRef = useRef(false);
@@ -373,6 +396,7 @@ export default function RealTimeExercise({
 
   const [poseDetected, setPoseDetected] = useState(false);
   const [showJointWarning, setShowJointWarning] = useState(false);
+  const [currentAngle, setCurrentAngle] = useState<number | null>(null);
 
   // ========================================
   // 초기화 단계 상태 (음성 타이밍 관리)
@@ -590,12 +614,15 @@ export default function RealTimeExercise({
     if (isPausedRef.current || isRestingRef.current) return;
     if (!isCalibrationCompleteRef.current) return;
 
-    // 무릎 각도 계산
-    const kneeAngle = getKneeAngle(landmarks);
+    // 무릎 각도 계산 (스무딩 적용)
+    const kneeAngle = getKneeAngle(landmarks, angleSmootherRef.current);
     if (kneeAngle === null) {
       // visibility 부족 - 경고는 onResults에서 처리
       return;
     }
+
+    // 실시간 각도 업데이트
+    setCurrentAngle(kneeAngle);
 
     const now = Date.now();
     const cooldown = exercise.countingCooldown ?? 500;
@@ -688,9 +715,12 @@ export default function RealTimeExercise({
     if (isPausedRef.current || isRestingRef.current) return;
     if (!isCalibrationCompleteRef.current) return;
 
-    // 어깨 각도 계산
-    const shoulderAngle = getShoulderAngle(landmarks);
+    // 어깨 각도 계산 (스무딩 적용)
+    const shoulderAngle = getShoulderAngle(landmarks, angleSmootherRef.current);
     if (shoulderAngle === null) return;
+
+    // 실시간 각도 업데이트
+    setCurrentAngle(shoulderAngle);
 
     const now = Date.now();
     const cooldown = exercise.countingCooldown ?? 500;
@@ -1728,108 +1758,101 @@ export default function RealTimeExercise({
     (progressPercent / exercise.sets);
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col">
-      {/* 카메라 영역 - 고정 높이로 휴식 중에도 비율 유지 */}
-      <div className="h-[50vh] flex items-center justify-center shrink-0">
-        <div className="relative h-full aspect-[9/16] overflow-hidden rounded-lg">
-          <video
-            ref={videoRef}
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ transform: 'scaleX(-1)' }}
-            playsInline
-            muted
-          />
+    <div className="fixed inset-0 bg-black z-50 flex flex-row">
+      {/* ========================================
+          왼쪽 영역: 카메라 + 피드백 배너
+          ======================================== */}
+      <div className="w-2/5 flex flex-col p-4">
+        {/* 카메라 영역 */}
+        <div className="flex-1 flex items-center justify-center">
+          <div className="relative w-full h-full max-w-sm aspect-[9/16] overflow-hidden rounded-lg">
+            <video
+              ref={videoRef}
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ transform: 'scaleX(-1)' }}
+              playsInline
+              muted
+            />
 
-          <canvas
-            ref={canvasRef}
-            width={720}
-            height={1280}
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ transform: 'scaleX(-1)' }}
-          />
+            <canvas
+              ref={canvasRef}
+              width={720}
+              height={1280}
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ transform: 'scaleX(-1)' }}
+            />
 
-          {/* 로딩 오버레이 */}
-          <AnimatePresence>
-            {isLoading && (
-              <motion.div
-                initial={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-black/80 flex items-center justify-center"
-              >
-                <div className="text-white text-center">
-                  <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                  <p className="text-lg font-medium">카메라 준비 중...</p>
+            {/* 로딩 오버레이 */}
+            <AnimatePresence>
+              {isLoading && (
+                <motion.div
+                  initial={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 bg-black/80 flex items-center justify-center"
+                >
+                  <div className="text-white text-center">
+                    <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-lg font-medium">카메라 준비 중...</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* 상단 헤더 */}
+            <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/70 to-transparent">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="text-white text-lg font-bold">{exercise.name}</h2>
+                  <p className="text-white/70 text-xs">{exercise.description}</p>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* 상단 헤더 */}
-          <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/70 to-transparent">
-            <div className="flex justify-between items-start">
-              <div>
-                <h2 className="text-white text-lg font-bold">{exercise.name}</h2>
-                <p className="text-white/70 text-xs">{exercise.description}</p>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleCancel}
+                  className="text-white hover:bg-card/20 h-8 w-8"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleCancel}
-                className="text-white hover:bg-card/20 h-8 w-8"
-              >
-                <X className="w-5 h-5" />
-              </Button>
             </div>
+
+            {/* 포즈 미감지 경고 */}
+            {!isLoading && !poseDetected && (
+              <div className="absolute bottom-2 left-2 right-2">
+                <Card className="bg-yellow-500/90 border-0">
+                  <CardContent className="p-2 text-center">
+                    <p className="text-white text-xs font-medium">
+                      카메라에 전신이 보이도록 위치를 조정해주세요
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* 관절 visibility 경고 */}
+            {!isLoading && poseDetected && showJointWarning && (
+              <div className="absolute bottom-2 left-2 right-2">
+                <Card className="bg-orange-500/90 border-0">
+                  <CardContent className="p-2 text-center">
+                    <p className="text-white text-xs font-medium">
+                      {exercise.id === 'squat'
+                        ? '하체가 보이도록 카메라 위치를 조정해주세요'
+                        : '무릎이 보이도록 카메라 위치를 조정해주세요'}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </div>
-
-          {/* 포즈 미감지 경고 */}
-          {!isLoading && !poseDetected && (
-            <div className="absolute bottom-2 left-2 right-2">
-              <Card className="bg-yellow-500/100/90 border-0">
-                <CardContent className="p-2 text-center">
-                  <p className="text-white text-xs font-medium">
-                    카메라에 전신이 보이도록 위치를 조정해주세요
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* 관절 visibility 경고 */}
-          {!isLoading && poseDetected && showJointWarning && (
-            <div className="absolute bottom-2 left-2 right-2">
-              <Card className="bg-orange-500/90 border-0">
-                <CardContent className="p-2 text-center">
-                  <p className="text-white text-xs font-medium">
-                    {exercise.id === 'squat'
-                      ? '하체가 보이도록 카메라 위치를 조정해주세요'
-                      : '무릎이 보이도록 카메라 위치를 조정해주세요'}
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
         </div>
-      </div>
 
-      {/* 피드백 배너 (카메라 아래, 카드 위) */}
-      <div className="px-4 py-2">
-        <motion.div
-          key={feedback + (initPhase === 'countdown' ? readyCountdown : '')}
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={`text-center py-3 px-6 rounded-2xl ${
-            feedbackType === 'success'
-              ? 'bg-green-500/100'
-              : feedbackType === 'warning'
-                ? 'bg-orange-500'
-                : feedbackType === 'error'
-                  ? 'bg-red-500/100'
-                  : 'bg-blue-500/100'
-          }`}
-        >
-          {/* 카운트다운 중일 때는 큰 숫자 표시 */}
-          {initPhase === 'countdown' ? (
+        {/* 피드백 배너 */}
+        <div className={`mt-4 py-3 px-6 rounded-xl text-center ${
+          feedbackType === 'success' ? 'bg-green-500' :
+          feedbackType === 'warning' ? 'bg-orange-500' :
+          feedbackType === 'error' ? 'bg-red-500' : 'bg-blue-500'
+        }`}>
+          {initPhase === 'countdown' || initPhase === 'squat_countdown' ? (
             <div className="flex items-center justify-center gap-3">
               <span className="text-white text-lg">{feedback}</span>
               <span className="text-white text-3xl font-bold">{readyCountdown}</span>
@@ -1837,52 +1860,51 @@ export default function RealTimeExercise({
           ) : (
             <p className="text-white text-lg font-bold">{feedback}</p>
           )}
-        </motion.div>
+        </div>
       </div>
 
-      {/* 하단 정보 패널 */}
-      <div className="bg-black/80 p-4 pb-8">
+      {/* ========================================
+          오른쪽 영역: 정보 패널
+          ======================================== */}
+      <div className="w-3/5 bg-gray-900 p-6 flex flex-col overflow-y-auto">
         {/* 세트/횟수 표시 */}
-        <Card className="mb-4 bg-card/95 backdrop-blur">
+        <Card className="mb-4 bg-gray-800 border-gray-700">
           <CardContent className="p-4">
             {isResting ? (
-              // 휴식 중 표시
               <div className="text-center">
-                <p className="text-muted-foreground text-sm mb-2">휴식 중</p>
+                <p className="text-gray-400 text-sm mb-2">휴식 중</p>
                 <motion.p
                   key={restTime}
                   initial={{ scale: 1.2 }}
                   animate={{ scale: 1 }}
-                  className="text-5xl font-bold text-blue-600"
+                  className="text-5xl font-bold text-blue-400"
                 >
                   {restTime}
-                  <span className="text-2xl text-muted-foreground ml-1">초</span>
+                  <span className="text-2xl text-gray-500 ml-1">초</span>
                 </motion.p>
               </div>
             ) : (
-              // 운동 중 표시
               <>
                 <div className="flex justify-around text-center mb-4">
                   <div>
-                    <p className="text-muted-foreground text-xs mb-1">세트</p>
-                    <p className="text-3xl font-bold">
+                    <p className="text-gray-400 text-xs mb-1">세트</p>
+                    <p className="text-3xl font-bold text-white">
                       {currentSet}
-                      <span className="text-muted-foreground text-lg">/{exercise.sets}</span>
+                      <span className="text-gray-500 text-lg">/{exercise.sets}</span>
                     </p>
                   </div>
-                  <div className="w-px bg-muted" />
+                  <div className="w-px bg-gray-700" />
                   <div>
-                    <p className="text-muted-foreground text-xs mb-1">횟수</p>
-                    <p className="text-3xl font-bold">
+                    <p className="text-gray-400 text-xs mb-1">횟수</p>
+                    <p className="text-3xl font-bold text-white">
                       {currentRep}
-                      <span className="text-muted-foreground text-lg">/{exercise.reps}</span>
+                      <span className="text-gray-500 text-lg">/{exercise.reps}</span>
                     </p>
                   </div>
                 </div>
 
-                {/* 진행률 바 */}
                 <div className="space-y-2">
-                  <div className="flex justify-between text-xs text-muted-foreground">
+                  <div className="flex justify-between text-xs text-gray-400">
                     <span>현재 세트 진행률</span>
                     <span>{Math.round(progressPercent)}%</span>
                   </div>
@@ -1893,16 +1915,34 @@ export default function RealTimeExercise({
           </CardContent>
         </Card>
 
+        {/* ROMBar - 실시간 각도 시각화 */}
+        {!isResting && (exercise.id === 'squat' || exercise.id === 'arm-raise') && (
+          <Card className="mb-4 bg-gray-800 border-gray-700">
+            <CardContent className="p-4">
+              <ROMBar
+                currentAngle={currentAngle}
+                startAngle={exercise.id === 'squat'
+                  ? (squatStandingAngleRef.current ?? 170)
+                  : (exercise.angleConfig?.startAngle ?? 30)}
+                targetAngle={exercise.id === 'squat'
+                  ? (squatDownAngleRef.current ?? 90)
+                  : (exercise.angleConfig?.targetAngle ?? 150)}
+                label={exercise.id === 'squat' ? '무릎 각도' : '어깨 각도'}
+              />
+            </CardContent>
+          </Card>
+        )}
+
         {/* 자세 포인트 표시 */}
         {!isResting && (
-          <Card className="mb-4 bg-card/10 border-white/20">
+          <Card className="mb-4 bg-gray-800 border-gray-700">
             <CardContent className="p-3">
-              <p className="text-white/70 text-xs mb-2">자세 포인트</p>
+              <p className="text-gray-400 text-xs mb-2">자세 포인트</p>
               <div className="flex flex-wrap gap-2">
                 {exercise.keyPoints.map((point, idx) => (
                   <span
                     key={idx}
-                    className="text-xs text-white bg-card/20 px-2 py-1 rounded-full"
+                    className="text-xs text-white bg-gray-700 px-2 py-1 rounded-full"
                   >
                     {point}
                   </span>
@@ -1913,10 +1953,10 @@ export default function RealTimeExercise({
         )}
 
         {/* 컨트롤 버튼 */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 mt-auto">
           <Button
             variant="outline"
-            className="flex-1 h-14 bg-card hover:bg-accent border-0"
+            className="flex-1 h-14 bg-gray-800 hover:bg-gray-700 border-gray-600 text-white"
             onClick={togglePause}
           >
             {isPaused ? (
@@ -1935,7 +1975,7 @@ export default function RealTimeExercise({
           <Button
             variant="outline"
             size="icon"
-            className="h-14 w-14 bg-card hover:bg-accent border-0"
+            className="h-14 w-14 bg-gray-800 hover:bg-gray-700 border-gray-600 text-white"
             onClick={toggleMute}
           >
             {isMuted ? (
@@ -1948,13 +1988,13 @@ export default function RealTimeExercise({
 
         {/* 전체 진행률 */}
         <div className="mt-4">
-          <div className="flex justify-between text-xs text-white/60 mb-1">
+          <div className="flex justify-between text-xs text-gray-400 mb-1">
             <span>전체 진행률</span>
             <span>{Math.round(setProgressPercent)}%</span>
           </div>
-          <div className="h-1 bg-card/20 rounded-full overflow-hidden">
+          <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
             <motion.div
-              className="h-full bg-green-500/100"
+              className="h-full bg-green-500"
               animate={{ width: `${setProgressPercent}%` }}
               transition={{ duration: 0.3 }}
             />
