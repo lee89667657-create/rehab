@@ -163,10 +163,11 @@ function JointCard({ label, range, value, leftValue, rightValue }: JointCardProp
   };
   const markerPos = getMarkerPosition();
 
-  // 값 표시 문자열
+  // 값 표시 문자열 (소수점 1자리까지)
+  const formatValue = (v: number) => Number(v.toFixed(1));
   const valueText = isPaired
-    ? `${leftValue}${range.unit} / ${rightValue}${range.unit}`
-    : `${value}${range.unit}`;
+    ? `${formatValue(leftValue)}${range.unit} / ${formatValue(rightValue)}${range.unit}`
+    : `${formatValue(value ?? 0)}${range.unit}`;
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 min-h-[140px] flex flex-col justify-between">
@@ -262,7 +263,7 @@ export function BalanceCard({ label, percentDiff, dominantSide }: BalanceCardPro
           )}
         </div>
         <span className={`text-lg font-bold ${colors.text}`}>
-          {percentDiff}% 차이
+          {Number(percentDiff.toFixed(1))}% 차이
         </span>
       </div>
 

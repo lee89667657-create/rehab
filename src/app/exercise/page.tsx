@@ -15,6 +15,8 @@ import {
   Target,
   Timer,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Camera,
   TrendingUp,
   Loader2,
@@ -343,6 +345,7 @@ interface ExerciseProgramViewProps {
 
 function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
   const router = useRouter();
+  const [showAllExercises, setShowAllExercises] = useState(false);
 
   const { program, programExercises, primaryIssue } = useMemo(() => {
     const scores = {
@@ -552,6 +555,70 @@ function ExerciseProgramView({ analysisResult }: ExerciseProgramViewProps) {
               ))}
           </div>
         </motion.section>
+
+        {/* 전체 운동 보기 버튼 */}
+        <motion.section variants={itemVariants} className="mt-8">
+          <Button
+            variant="outline"
+            onClick={() => setShowAllExercises(!showAllExercises)}
+            className="w-full h-12 border-slate-700 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            {showAllExercises ? (
+              <>
+                <ChevronUp className="w-5 h-5 mr-2" />
+                전체 운동 접기
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-5 h-5 mr-2" />
+                전체 운동 보기
+              </>
+            )}
+          </Button>
+        </motion.section>
+
+        {/* 전체 운동 목록 (토글) */}
+        {showAllExercises && (
+          <div className="mt-6 space-y-8">
+            {/* 전체 타이머 운동 */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                  <Timer className="w-4 h-4 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">전체 타이머 운동</h3>
+                  <p className="text-xs text-muted-foreground">자세를 유지하며 시간 측정</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {TIMER_EXERCISES.map((exercise) => (
+                  <TimerExerciseCard key={exercise.id} exercise={exercise} />
+                ))}
+              </div>
+            </section>
+
+            {/* 전체 실시간 분석 운동 */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-green-500/20 dark:bg-green-900/30 flex items-center justify-center">
+                  <Camera className="w-4 h-4 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">전체 실시간 분석 운동</h3>
+                  <p className="text-xs text-muted-foreground">카메라로 자동 횟수 카운팅</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {COUNTABLE_EXERCISES.map((exercise) => (
+                  <RealtimeExerciseCard key={exercise.id} exercise={exercise} />
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
 
         {/* 팁 카드 */}
         <motion.section variants={itemVariants} className="mt-6 mb-24">

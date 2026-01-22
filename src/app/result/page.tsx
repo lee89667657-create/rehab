@@ -65,8 +65,8 @@ import {
   getAsymmetrySummary,
 } from '@/lib/advancedAnalysis';
 
-// 고급 분석 리포트 컴포넌트
-import AdvancedReport, { BalanceCard } from '@/components/analysis/AdvancedReport';
+// 고급 분석 리포트 컴포넌트 (통합 섹션으로 이동하여 현재 미사용)
+// import AdvancedReport, { BalanceCard } from '@/components/analysis/AdvancedReport';
 
 // 3D 스켈레톤 시각화 컴포넌트 (추후 사용 예정)
 // import Skeleton3D from '@/components/analysis/Skeleton3D';
@@ -279,6 +279,612 @@ const itemVariants = {
     transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const },
   },
 };
+
+// ============================================================
+// 컴포넌트: 스켈레톤 정렬 시각화 (통합형 - 상세 분석 + 균형 포함)
+// ============================================================
+
+interface SkeletonAlignmentProps {
+  jointAngles: JointAngles | null;
+  asymmetryResults?: AsymmetryResult[];
+  capturedImage?: string | null;
+}
+
+// ============================================================
+// 세련된 3구간 범위 표시 바 컴포넌트
+// ============================================================
+
+interface RangeBarProps {
+  value: number;
+  type: 'tilt' | 'forward' | 'angle' | 'balance';
+  status: 'normal' | 'warning' | 'danger';
+}
+
+function RangeBar({ value, type, status }: RangeBarProps) {
+  // 마커 색상 (세련된 팔레트)
+  const markerColor = status === 'danger' ? 'bg-rose-400' : status === 'warning' ? 'bg-amber-400' : 'bg-teal-400';
+
+  // 상태 기반 마커 위치 계산
+  // 바 구간: 0-20% (좌측 주의) | 20-80% (정상) | 80-100% (우측 주의)
+  let markerPosition: number;
+
+  if (type === 'tilt') {
+    // 좌우 기울기 (어깨, 골반, 무릎)
+    if (status === 'normal') {
+      // 정상: 중앙 구간 (20-80%), 값에 따라 미세 조정
+      markerPosition = 50 + (value * 3);
+      markerPosition = Math.max(25, Math.min(75, markerPosition));
+    } else if (value > 0) {
+      // 우측으로 기울어짐: 오른쪽 구간 (80-100%)
+      markerPosition = status === 'danger' ? 92 : 88;
+    } else {
+      // 좌측으로 기울어짐: 왼쪽 구간 (0-20%)
+      markerPosition = status === 'danger' ? 8 : 12;
+    }
+  } else if (type === 'forward') {
+    // 전방 거리 (거북목) - 정상은 왼쪽, 전방은 오른쪽
+    if (status === 'normal') {
+      // 정상: 왼쪽~중앙 구간 (20-50%)
+      markerPosition = 25 + (value * 8);
+      markerPosition = Math.max(22, Math.min(50, markerPosition));
+    } else {
+      // 주의/위험: 오른쪽 구간 (80-100%)
+      markerPosition = status === 'danger' ? 92 : 85;
+    }
+  } else if (type === 'balance') {
+    // 균형 - 정상은 왼쪽, 불균형은 오른쪽
+    if (status === 'normal') {
+      markerPosition = 25 + (value * 10);
+      markerPosition = Math.max(22, Math.min(50, markerPosition));
+    } else {
+      markerPosition = status === 'danger' ? 92 : 85;
+    }
+  } else {
+    // 각도 (등굽음, 허리 전만)
+    // 정상 범위: 중앙, 감소: 왼쪽, 과도: 오른쪽
+    if (status === 'normal') {
+      // 정상: 중앙 구간
+      markerPosition = 50;
+    } else {
+      // 등굽음: 40 이하 평평(좌), 50+ 과도(우)
+      // 허리 전만: 30 미만 감소(좌), 45+ 과도(우)
+      if (value < 30) {
+        // 감소/평평: 왼쪽 구간
+        markerPosition = status === 'danger' ? 8 : 12;
+      } else {
+        // 과도: 오른쪽 구간
+        markerPosition = status === 'danger' ? 92 : 88;
+      }
+    }
+  }
+
+  markerPosition = Math.max(6, Math.min(94, markerPosition));
+
+  return (
+    <div className="relative h-2.5 rounded-full overflow-hidden flex bg-slate-700/30">
+      {/* 왼쪽 주의 구간 20% */}
+      <div className="h-full bg-slate-600/40" style={{ width: '20%' }} />
+      {/* 중앙 정상 구간 60% */}
+      <div className="h-full bg-teal-500/30" style={{ width: '60%' }} />
+      {/* 오른쪽 주의 구간 20% */}
+      <div className="h-full bg-slate-600/40" style={{ width: '20%' }} />
+
+      {/* 마커 */}
+      <div
+        className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 ${markerColor} rounded-full border-2 border-slate-900/50 shadow-lg transition-all duration-300`}
+        style={{ left: `calc(${markerPosition}% - 8px)` }}
+      />
+    </div>
+  );
+}
+
+// ============================================================
+// 분석 항목 카드 (간단 설명 포함)
+// ============================================================
+
+interface AnalysisItemRowProps {
+  label: string;
+  value: number;
+  unit: string;
+  status: 'normal' | 'warning' | 'danger';
+  description: string;
+  itemType: 'shoulder' | 'hip' | 'knee' | 'neck' | 'thoracic' | 'lumbar';
+}
+
+function AnalysisItemRow({ label, value, unit, status, itemType }: AnalysisItemRowProps) {
+  // 상태별 색상
+  const valueColor = status === 'danger' ? 'text-rose-400' : status === 'warning' ? 'text-amber-400' : 'text-teal-400';
+  const badgeBg = status === 'danger' ? 'bg-rose-500/20 text-rose-400' : status === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-teal-500/20 text-teal-400';
+  const badgeText = status === 'danger' ? '위험' : status === 'warning' ? '주의' : '정상';
+
+  // 간단 설명 생성
+  const getSimpleDescription = (): string => {
+    const absValue = Math.abs(value);
+
+    switch (itemType) {
+      case 'shoulder':
+        if (absValue <= 2) return '균형이 잘 잡혀있어요';
+        if (value > 0) return '왼쪽 어깨가 올라가 있어요';
+        return '오른쪽 어깨가 올라가 있어요';
+      case 'hip':
+        if (absValue <= 2) return '골반이 수평이에요';
+        if (value > 0) return '골반이 좌측으로 기울어져 있어요';
+        return '골반이 우측으로 기울어져 있어요';
+      case 'knee':
+        if (absValue <= 2) return '무릎 정렬이 좋아요';
+        if (value > 0) return '무릎이 좌측으로 틀어져 있어요';
+        return '무릎이 우측으로 틀어져 있어요';
+      case 'neck':
+        if (absValue <= 2.5) return '목 위치가 정상이에요';
+        return '머리가 앞으로 나와있어요';
+      case 'thoracic':
+        if (absValue <= 40) return '등 곡선이 정상이에요';
+        return '등이 굽어있어요';
+      case 'lumbar':
+        if (absValue >= 30 && absValue <= 45) return '허리 곡선이 정상이에요';
+        return '허리 곡선에 주의가 필요해요';
+      default:
+        return '';
+    }
+  };
+
+  // 범위 라벨 생성
+  const getRangeLabels = (): { left: string; center: string; right: string } => {
+    switch (itemType) {
+      case 'shoulder':
+      case 'hip':
+      case 'knee':
+        return { left: '좌', center: '정상', right: '우' };
+      case 'neck':
+        return { left: '정상', center: '', right: '전방' };
+      case 'thoracic':
+        return { left: '평평', center: '정상', right: '과도' };
+      case 'lumbar':
+        return { left: '감소', center: '정상', right: '과도' };
+      default:
+        return { left: '', center: '', right: '' };
+    }
+  };
+
+  const rangeLabels = getRangeLabels();
+
+  // 바 타입 결정
+  const barType = ['shoulder', 'hip', 'knee'].includes(itemType)
+    ? 'tilt'
+    : itemType === 'neck'
+      ? 'forward'
+      : 'angle';
+
+  return (
+    <div className="rounded-xl p-3.5 bg-slate-800/30 border border-slate-700/50 space-y-2.5">
+      {/* 헤더: 항목명 + 값 | 상태 뱃지 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-foreground">{label}</span>
+          <span className={`text-base font-bold font-mono ${valueColor}`}>
+            {Math.abs(value)}{unit}
+          </span>
+        </div>
+        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${badgeBg}`}>
+          {badgeText}
+        </span>
+      </div>
+
+      {/* 3구간 범위 바 */}
+      <RangeBar value={value} type={barType} status={status} />
+
+      {/* 범위 라벨 */}
+      <div className="flex justify-between text-[10px] text-muted-foreground -mt-1">
+        <span>{rangeLabels.left}</span>
+        {rangeLabels.center && <span>{rangeLabels.center}</span>}
+        <span>{rangeLabels.right}</span>
+      </div>
+
+      {/* 간단 설명 */}
+      <p className="text-xs text-muted-foreground">
+        {getSimpleDescription()}
+      </p>
+    </div>
+  );
+}
+
+// ============================================================
+// 균형 시각화용 프로그레스 바
+// ============================================================
+
+interface AnalysisProgressBarProps {
+  value: number;
+  status: 'normal' | 'warning' | 'danger';
+}
+
+function AnalysisProgressBar({ value, status }: AnalysisProgressBarProps) {
+  return <RangeBar value={value} type="balance" status={status} />;
+}
+
+// 균형 시각화 컴포넌트
+interface BalanceVisualizationProps {
+  title: string;
+  percentDiff: number;
+  dominantSide?: 'left' | 'right' | 'balanced';
+}
+
+function BalanceVisualization({ title, percentDiff, dominantSide }: BalanceVisualizationProps) {
+  const status: 'normal' | 'warning' | 'danger' = percentDiff <= 2 ? 'normal' : percentDiff <= 5 ? 'warning' : 'danger';
+  const valueColor = status === 'danger' ? 'text-rose-400' : status === 'warning' ? 'text-amber-400' : 'text-teal-400';
+  const badgeBg = status === 'danger' ? 'bg-rose-500/20 text-rose-400' : status === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-teal-500/20 text-teal-400';
+  const badgeText = status === 'danger' ? '불균형' : status === 'warning' ? '주의' : '균형';
+
+  // 간단 설명
+  const getDescription = (): string => {
+    if (status === 'normal') return '좌우 균형이 잘 맞아요';
+    const side = dominantSide === 'left' ? '좌측' : dominantSide === 'right' ? '우측' : '';
+    if (status === 'warning') return side ? `${side}이 약간 우세해요` : '약간의 차이가 있어요';
+    return side ? `${side}으로 많이 치우쳐 있어요` : '균형 조절이 필요해요';
+  };
+
+  return (
+    <div className="rounded-xl p-3.5 bg-slate-800/30 border border-slate-700/50 space-y-2.5">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-foreground">{title}</span>
+          <span className={`text-base font-bold font-mono ${valueColor}`}>
+            {percentDiff.toFixed(1)}%
+          </span>
+        </div>
+        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${badgeBg}`}>
+          {badgeText}
+        </span>
+      </div>
+
+      {/* 범위 바 */}
+      <AnalysisProgressBar value={percentDiff} status={status} />
+
+      {/* 간단 설명 */}
+      <p className="text-xs text-muted-foreground">
+        {getDescription()}
+      </p>
+    </div>
+  );
+}
+
+function SkeletonAlignmentVisualization({ jointAngles, asymmetryResults }: SkeletonAlignmentProps) {
+  const [frontImageError, setFrontImageError] = useState(false);
+  const [sideImageError, setSideImageError] = useState(false);
+
+  if (!jointAngles) return null;
+
+  // ===== 정면 측정값 계산 =====
+  const shoulderDiff = jointAngles.shoulderLeft - jointAngles.shoulderRight;
+  const shoulderTiltAngle = Number((shoulderDiff / 2).toFixed(1));
+  const shoulderStatus: 'normal' | 'warning' | 'danger' = Math.abs(shoulderTiltAngle) <= 2 ? 'normal' : Math.abs(shoulderTiltAngle) <= 5 ? 'warning' : 'danger';
+
+  const hipDiff = jointAngles.hipLeft - jointAngles.hipRight;
+  const hipTiltAngle = Number((hipDiff / 5).toFixed(1));
+  const hipStatus: 'normal' | 'warning' | 'danger' = Math.abs(hipTiltAngle) <= 2 ? 'normal' : Math.abs(hipTiltAngle) <= 5 ? 'warning' : 'danger';
+
+  const kneeDiff = jointAngles.kneeLeft - jointAngles.kneeRight;
+  const kneeTiltAngle = Number((kneeDiff / 3).toFixed(1));
+  const kneeStatus: 'normal' | 'warning' | 'danger' = Math.abs(kneeTiltAngle) <= 2 ? 'normal' : Math.abs(kneeTiltAngle) <= 5 ? 'warning' : 'danger';
+
+  // ===== 측면 측정값 계산 =====
+  const neckForwardDistance = Number((jointAngles.neck * 0.3).toFixed(1));
+  const neckStatus: 'normal' | 'warning' | 'danger' = neckForwardDistance <= 2.5 ? 'normal' : neckForwardDistance <= 5 ? 'warning' : 'danger';
+
+  const thoracicKyphosis = Number((jointAngles.trunk * 1.5 + 25).toFixed(1));
+  const thoracicStatus: 'normal' | 'warning' | 'danger' = thoracicKyphosis <= 40 ? 'normal' : thoracicKyphosis <= 50 ? 'warning' : 'danger';
+
+  const lumbarLordosis = Number((45 - jointAngles.trunk * 0.8).toFixed(1));
+  const lumbarStatus: 'normal' | 'warning' | 'danger' = lumbarLordosis >= 30 && lumbarLordosis <= 45 ? 'normal' : lumbarLordosis >= 20 && lumbarLordosis <= 55 ? 'warning' : 'danger';
+
+  // ===== 균형 계산 =====
+  const shoulderBalance = asymmetryResults?.find(a => a.joint === '어깨');
+  const frontBalancePercent = shoulderBalance?.percentDiff ?? Math.abs(shoulderTiltAngle) * 0.8;
+  const frontBalanceSide = shoulderTiltAngle > 0 ? 'left' : shoulderTiltAngle < 0 ? 'right' : 'balanced';
+
+  const sideBalancePercent = neckForwardDistance * 0.6;
+
+  // ===== 색상 =====
+  const colors = {
+    normal: '#22c55e',
+    warning: '#fbbf24',
+    danger: '#ef4444',
+    reference: '#3b82f6',
+  };
+
+  const getStatusColor = (status: string) => colors[status as keyof typeof colors] || '#6B7280';
+
+  // ===== SVG 좌표 (180x400 이미지 기준, viewBox 100x220) =====
+  const vw = 100, vh = 220;
+  const cx = 54; // 골격 척추 중심이 오른쪽에 있어서 조정
+
+  // 정면 좌표 (골격 이미지 실제 관절 위치에 맞춤)
+  const f = { shoulderY: 52, hipY: 115, kneeY: 162, sw: 18, hw: 14, kw: 10 };
+  // 측면 좌표
+  // 측면 좌표 (viewBox 100x220 기준, 골격 이미지에 맞춤)
+  const cxSide = 48; // 측면 골격은 중앙보다 약간 왼쪽
+  const s = { earY: 38, shoulderY: 55, thoracicY: 80, lumbarY: 105, hipY: 120 };
+
+  // 기울기 적용
+  const sLeftY = f.shoulderY - shoulderTiltAngle * 1.2;
+  const sRightY = f.shoulderY + shoulderTiltAngle * 1.2;
+  const hLeftY = f.hipY - hipTiltAngle * 1.2;
+  const hRightY = f.hipY + hipTiltAngle * 1.2;
+  const kLeftY = f.kneeY - kneeTiltAngle * 1.0;
+  const kRightY = f.kneeY + kneeTiltAngle * 1.0;
+  const headOffset = neckForwardDistance * 2.5;
+
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
+      {/* 헤더 */}
+      <div className="px-4 py-3 border-b border-border bg-muted/30">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <Activity className="w-4 h-4 text-primary" />
+          자세 정렬 분석
+        </h3>
+      </div>
+
+      <div className="p-4 space-y-6">
+        {/* ==================== 정면 섹션 ==================== */}
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+            정면 · FRONT VIEW
+          </p>
+
+          <div className="flex gap-4">
+            {/* 정면 골격 이미지 */}
+            <div
+              className="relative rounded-xl overflow-hidden border border-border/50 flex-shrink-0 bg-gradient-to-b from-slate-800 to-slate-900"
+              style={{ width: '180px', height: '400px' }}
+            >
+              {!frontImageError && (
+                <img
+                  src="/images/skeleton_front1image.png"
+                  alt="Front Skeleton"
+                  className="absolute inset-0 w-full h-full object-contain"
+                  style={{ filter: 'brightness(0.85) contrast(1.05)' }}
+                  onError={() => setFrontImageError(true)}
+                />
+              )}
+
+              {/* SVG 오버레이 */}
+              <svg viewBox={`0 0 ${vw} ${vh}`} className="absolute inset-0 w-full h-full" style={{ zIndex: 10 }}>
+                <defs>
+                  <pattern id="grid-front" width="10" height="10" patternUnits="userSpaceOnUse">
+                    <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid-front)" />
+
+                {/* 기준선 */}
+                <line x1={cx} y1="15" x2={cx} y2={vh - 10} stroke={colors.reference} strokeWidth="0.8" strokeDasharray="3 2" opacity="0.4" />
+
+                {/* 어깨 */}
+                <line x1={cx - f.sw} y1={sLeftY} x2={cx + f.sw} y2={sRightY} stroke={getStatusColor(shoulderStatus)} strokeWidth="2" />
+                <circle cx={cx - f.sw} cy={sLeftY} r="4" fill={getStatusColor(shoulderStatus)} />
+                <circle cx={cx + f.sw} cy={sRightY} r="4" fill={getStatusColor(shoulderStatus)} />
+
+                {/* 골반 */}
+                <line x1={cx - f.hw} y1={hLeftY} x2={cx + f.hw} y2={hRightY} stroke={getStatusColor(hipStatus)} strokeWidth="2" />
+                <circle cx={cx - f.hw} cy={hLeftY} r="4" fill={getStatusColor(hipStatus)} />
+                <circle cx={cx + f.hw} cy={hRightY} r="4" fill={getStatusColor(hipStatus)} />
+
+                {/* 무릎 */}
+                <line x1={cx - f.kw} y1={kLeftY} x2={cx + f.kw} y2={kRightY} stroke={getStatusColor(kneeStatus)} strokeWidth="2" />
+                <circle cx={cx - f.kw} cy={kLeftY} r="3.5" fill={getStatusColor(kneeStatus)} />
+                <circle cx={cx + f.kw} cy={kRightY} r="3.5" fill={getStatusColor(kneeStatus)} />
+
+                {/* 좌/우 라벨 */}
+                <text x="6" y="12" fontSize="8" fill="rgba(255,255,255,0.5)" fontWeight="600">좌</text>
+                <text x={vw - 14} y="12" fontSize="8" fill="rgba(255,255,255,0.5)" fontWeight="600">우</text>
+              </svg>
+            </div>
+
+            {/* 정면 상세 분석 - 테이블 형식 */}
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-medium text-muted-foreground mb-2">몸 기울이기 · 좌우</p>
+              <div className="rounded-lg border border-slate-700/50 overflow-hidden">
+                {/* 테이블 헤더 */}
+                <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2 bg-slate-800/80 text-[10px] font-medium text-slate-400">
+                  <span>측정 항목</span>
+                  <span className="text-center">측정값</span>
+                  <span className="text-center">상태</span>
+                  <span>분석</span>
+                </div>
+                {/* 테이블 바디 */}
+                <div className="divide-y divide-slate-700/50">
+                  {/* 어깨 */}
+                  <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2.5 items-center hover:bg-slate-800/30 transition-colors">
+                    <span className="text-xs text-foreground">어깨 좌우 기울기</span>
+                    <span className={`text-sm font-bold text-center ${shoulderStatus === 'normal' ? 'text-teal-400' : shoulderStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>
+                      {Math.abs(shoulderTiltAngle)}°
+                    </span>
+                    <span className="flex justify-center">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${shoulderStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : shoulderStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                        {shoulderStatus === 'normal' ? '정상' : shoulderStatus === 'warning' ? '주의' : '위험'}
+                      </span>
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {Math.abs(shoulderTiltAngle) <= 2 ? '균형이 잘 잡혀있어요' : shoulderTiltAngle > 0 ? '왼쪽 어깨가 올라가 있어요' : '오른쪽 어깨가 올라가 있어요'}
+                    </span>
+                  </div>
+                  {/* 골반 */}
+                  <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2.5 items-center hover:bg-slate-800/30 transition-colors">
+                    <span className="text-xs text-foreground">골반 좌우 기울기</span>
+                    <span className={`text-sm font-bold text-center ${hipStatus === 'normal' ? 'text-teal-400' : hipStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>
+                      {Math.abs(hipTiltAngle)}°
+                    </span>
+                    <span className="flex justify-center">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${hipStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : hipStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                        {hipStatus === 'normal' ? '정상' : hipStatus === 'warning' ? '주의' : '위험'}
+                      </span>
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {Math.abs(hipTiltAngle) <= 2 ? '골반이 수평이에요' : hipTiltAngle > 0 ? '골반이 좌측으로 기울어져 있어요' : '골반이 우측으로 기울어져 있어요'}
+                    </span>
+                  </div>
+                  {/* 무릎 */}
+                  <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2.5 items-center hover:bg-slate-800/30 transition-colors">
+                    <span className="text-xs text-foreground">무릎 정렬</span>
+                    <span className={`text-sm font-bold text-center ${kneeStatus === 'normal' ? 'text-teal-400' : kneeStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>
+                      {Math.abs(kneeTiltAngle)}°
+                    </span>
+                    <span className="flex justify-center">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${kneeStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : kneeStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                        {kneeStatus === 'normal' ? '정상' : kneeStatus === 'warning' ? '주의' : '위험'}
+                      </span>
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {Math.abs(kneeTiltAngle) <= 2 ? '무릎 정렬이 좋아요' : kneeTiltAngle > 0 ? '무릎이 좌측으로 틀어져 있어요' : '무릎이 우측으로 틀어져 있어요'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 구분선 */}
+        <div className="border-t border-border/50" />
+
+        {/* ==================== 측면 섹션 ==================== */}
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+            측면 · SIDE VIEW
+          </p>
+
+          <div className="flex gap-4">
+            {/* 측면 골격 이미지 */}
+            <div
+              className="relative rounded-xl overflow-hidden border border-border/50 flex-shrink-0 bg-gradient-to-b from-slate-800 to-slate-900"
+              style={{ width: '180px', height: '400px' }}
+            >
+              {!sideImageError && (
+                <img
+                  src="/images/skeleton_side1image.png"
+                  alt="Side Skeleton"
+                  className="absolute inset-0 w-full h-full object-contain"
+                  style={{
+                    filter: 'brightness(0.85) contrast(1.05)',
+                    objectPosition: 'center 20%'
+                  }}
+                  onError={() => setSideImageError(true)}
+                />
+              )}
+
+              {/* SVG 오버레이 */}
+              <svg viewBox={`0 0 ${vw} ${vh}`} className="absolute inset-0 w-full h-full" style={{ zIndex: 10 }}>
+                <defs>
+                  <pattern id="grid-side" width="10" height="10" patternUnits="userSpaceOnUse">
+                    <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid-side)" />
+
+                {/* 기준선 */}
+                <line x1={cxSide} y1="15" x2={cxSide} y2={vh - 10} stroke={colors.reference} strokeWidth="0.8" strokeDasharray="3 2" opacity="0.4" />
+
+                {/* 거북목 */}
+                <circle cx={cxSide + headOffset} cy={s.earY} r="4.5" fill={getStatusColor(neckStatus)} />
+                <line x1={cxSide} y1={s.earY} x2={cxSide + headOffset} y2={s.earY} stroke={getStatusColor(neckStatus)} strokeWidth="2" />
+                <line x1={cxSide} y1={s.earY} x2={cxSide} y2={s.shoulderY} stroke="rgba(255,255,255,0.25)" strokeWidth="1" strokeDasharray="2 2" />
+
+                {/* 흉추 (등굽음) */}
+                <path d={`M ${cxSide} ${s.shoulderY} Q ${cxSide - 10} ${s.thoracicY} ${cxSide} ${s.lumbarY}`} fill="none" stroke={getStatusColor(thoracicStatus)} strokeWidth="2" />
+                <circle cx={cxSide - 8} cy={s.thoracicY} r="3.5" fill={getStatusColor(thoracicStatus)} />
+
+                {/* 요추 (허리) */}
+                <path d={`M ${cxSide} ${s.lumbarY} Q ${cxSide + 8} ${(s.lumbarY + s.hipY) / 2} ${cxSide} ${s.hipY}`} fill="none" stroke={getStatusColor(lumbarStatus)} strokeWidth="2" />
+                <circle cx={cxSide + 6} cy={(s.lumbarY + s.hipY) / 2} r="3.5" fill={getStatusColor(lumbarStatus)} />
+
+                {/* 후/전 라벨 */}
+                <text x="6" y="12" fontSize="8" fill="rgba(255,255,255,0.5)" fontWeight="600">후</text>
+                <text x={vw - 14} y="12" fontSize="8" fill="rgba(255,255,255,0.5)" fontWeight="600">전</text>
+              </svg>
+            </div>
+
+            {/* 측면 상세 분석 - 테이블 형식 */}
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-medium text-muted-foreground mb-2">몸 기울이기 · 앞뒤</p>
+              <div className="rounded-lg border border-slate-700/50 overflow-hidden">
+                {/* 테이블 헤더 */}
+                <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2 bg-slate-800/80 text-[10px] font-medium text-slate-400">
+                  <span>측정 항목</span>
+                  <span className="text-center">측정값</span>
+                  <span className="text-center">상태</span>
+                  <span>분석</span>
+                </div>
+                {/* 테이블 바디 */}
+                <div className="divide-y divide-slate-700/50">
+                  {/* 목 앞뒤 편차 */}
+                  <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2.5 items-center hover:bg-slate-800/30 transition-colors">
+                    <span className="text-xs text-foreground">목 앞뒤 편차</span>
+                    <span className={`text-sm font-bold text-center ${neckStatus === 'normal' ? 'text-teal-400' : neckStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>
+                      {neckForwardDistance}cm
+                    </span>
+                    <span className="flex justify-center">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${neckStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : neckStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                        {neckStatus === 'normal' ? '정상' : neckStatus === 'warning' ? '주의' : '위험'}
+                      </span>
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {neckForwardDistance <= 2.5 ? '목 위치가 정상이에요' : '머리가 앞으로 나와있어요'}
+                    </span>
+                  </div>
+                  {/* 흉추 후만각 */}
+                  <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2.5 items-center hover:bg-slate-800/30 transition-colors">
+                    <span className="text-xs text-foreground">흉추 후만각</span>
+                    <span className={`text-sm font-bold text-center ${thoracicStatus === 'normal' ? 'text-teal-400' : thoracicStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>
+                      {thoracicKyphosis}°
+                    </span>
+                    <span className="flex justify-center">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${thoracicStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : thoracicStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                        {thoracicStatus === 'normal' ? '정상' : thoracicStatus === 'warning' ? '주의' : '위험'}
+                      </span>
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {thoracicKyphosis <= 40 ? '등 곡선이 정상이에요' : '등이 굽어있어요'}
+                    </span>
+                  </div>
+                  {/* 요추 전만각 */}
+                  <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2.5 items-center hover:bg-slate-800/30 transition-colors">
+                    <span className="text-xs text-foreground">요추 전만각</span>
+                    <span className={`text-sm font-bold text-center ${lumbarStatus === 'normal' ? 'text-teal-400' : lumbarStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>
+                      {lumbarLordosis}°
+                    </span>
+                    <span className="flex justify-center">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${lumbarStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : lumbarStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                        {lumbarStatus === 'normal' ? '정상' : lumbarStatus === 'warning' ? '주의' : '위험'}
+                      </span>
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {lumbarLordosis >= 30 && lumbarLordosis <= 45 ? '허리 곡선이 정상이에요' : '허리 곡선에 주의가 필요해요'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 범례 */}
+        <div className="flex items-center justify-center gap-6 pt-2 text-[10px] text-muted-foreground border-t border-border/30 mt-4">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.normal }}></span>정상
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.warning }}></span>주의
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.danger }}></span>위험
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ============================================================
 // 컴포넌트: 질환 위험도 카드 (추후 사용 예정)
@@ -671,6 +1277,157 @@ function AnalysisItemCard({
 }
 
 // ============================================================
+// 컴포넌트: 자세 유형 진단 카드
+// ============================================================
+
+interface PostureTypeDiagnosisProps {
+  score: number;
+  results: ExtendedAnalysisItem[];
+}
+
+function PostureTypeDiagnosisCard({ score, results }: PostureTypeDiagnosisProps) {
+  // 자세 유형 판단
+  const getPostureType = () => {
+    const forwardHead = results.find(r => r.id === 'forward_head');
+    const shoulderTilt = results.find(r => r.id === 'shoulder_tilt');
+
+    // danger 상태 우선 체크
+    if (forwardHead?.grade === 'danger') {
+      return {
+        name: '거북목 위험',
+        description: '머리가 어깨보다 상당히 앞으로 나와 목과 어깨에 큰 부담이 가는 자세입니다.',
+        severity: 'danger' as const,
+      };
+    }
+    if (shoulderTilt?.grade === 'danger') {
+      return {
+        name: '라운드숄더 위험',
+        description: '어깨가 심하게 말려 있어 등과 목에 부담이 가는 자세입니다.',
+        severity: 'danger' as const,
+      };
+    }
+
+    // warning 상태 체크
+    if (forwardHead?.grade === 'warning') {
+      return {
+        name: '경미한 거북목',
+        description: '머리가 어깨보다 앞으로 나와 목에 부담이 가는 자세입니다.',
+        severity: 'warning' as const,
+      };
+    }
+    if (shoulderTilt?.grade === 'warning') {
+      return {
+        name: '라운드숄더 주의',
+        description: '어깨가 약간 앞으로 말려 있어 주의가 필요합니다.',
+        severity: 'warning' as const,
+      };
+    }
+
+    // 모두 정상
+    return {
+      name: '정상 자세',
+      description: '전반적으로 균형 잡힌 좋은 자세를 유지하고 있습니다.',
+      severity: 'normal' as const,
+    };
+  };
+
+  const postureType = getPostureType();
+
+  // 점수에 따른 원형 그래프 색상
+  const getScoreColor = () => {
+    if (score >= 80) return { stroke: '#14b8a6', bg: 'text-teal-400' }; // teal
+    if (score >= 60) return { stroke: '#f59e0b', bg: 'text-amber-400' }; // amber
+    return { stroke: '#f43f5e', bg: 'text-rose-400' }; // rose
+  };
+
+  const scoreColor = getScoreColor();
+
+  // SVG 원형 프로그레스 계산
+  const radius = 40;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (score / 100) * circumference;
+
+  // 상태 뱃지 색상
+  const getBadgeStyle = (grade: string) => {
+    if (grade === 'good') return 'bg-teal-500/20 text-teal-400 border-teal-500/30';
+    if (grade === 'warning') return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+    return 'bg-rose-500/20 text-rose-400 border-rose-500/30';
+  };
+
+  const getBadgeText = (grade: string) => {
+    if (grade === 'good') return '정상';
+    if (grade === 'warning') return '주의';
+    return '위험';
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+      <div className="flex items-center gap-5">
+        {/* 왼쪽: 원형 점수 그래프 */}
+        <div className="relative flex-shrink-0">
+          <svg width="100" height="100" className="transform -rotate-90">
+            {/* 배경 원 */}
+            <circle
+              cx="50"
+              cy="50"
+              r={radius}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="8"
+              className="text-slate-700/30"
+            />
+            {/* 프로그레스 원 */}
+            <circle
+              cx="50"
+              cy="50"
+              r={radius}
+              fill="none"
+              stroke={scoreColor.stroke}
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              className="transition-all duration-700 ease-out"
+            />
+          </svg>
+          {/* 중앙 점수 텍스트 */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className={`text-2xl font-bold ${scoreColor.bg}`}>{score}</span>
+            <span className="text-[10px] text-muted-foreground">/ 100</span>
+          </div>
+        </div>
+
+        {/* 오른쪽: 자세 유형 정보 */}
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-muted-foreground mb-1">당신의 자세 유형</p>
+          <h3 className={`text-xl font-bold mb-1 ${
+            postureType.severity === 'danger' ? 'text-rose-400' :
+            postureType.severity === 'warning' ? 'text-amber-400' : 'text-teal-400'
+          }`}>
+            {postureType.name}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+            {postureType.description}
+          </p>
+
+          {/* 상태 뱃지들 */}
+          <div className="flex flex-wrap gap-1.5">
+            {results.map((item) => (
+              <span
+                key={item.id}
+                className={`text-[10px] px-2 py-0.5 rounded-full border ${getBadgeStyle(item.grade)}`}
+              >
+                {item.name} {getBadgeText(item.grade)}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // 메인 컴포넌트: ResultPage
 // ============================================================
 
@@ -698,9 +1455,10 @@ export default function ResultPage() {
   // 아코디언 상태 (기본 접힘)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isSkeletonOpen, setIsSkeletonOpen] = useState(false);
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-  const [isBalanceOpen, setIsBalanceOpen] = useState(false);
-  const [isDetailedOpen, setIsDetailedOpen] = useState(false);
+  // 통합 섹션으로 이동하여 미사용
+  // const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  // const [isBalanceOpen, setIsBalanceOpen] = useState(false);
+  // const [isDetailedOpen, setIsDetailedOpen] = useState(false);
   const hasSavedRef = useRef(false);
 
   const [isFromHistory, setIsFromHistory] = useState(false);
@@ -914,45 +1672,19 @@ export default function ResultPage() {
   }, [storedJointAngles, isFromHistory, results]);
 
   /**
-   * ROM 분석 결과
-   * 관절각 데이터를 기반으로 ROM 분석을 수행합니다.
-   */
-  const romResults = useMemo((): ROMResult[] => {
-    if (!jointAngles) return [];
-    return analyzeAllROM(jointAngles);
-  }, [jointAngles]);
-
-  /**
-   * 좌우 비대칭 분석 결과
-   * 관절각 데이터를 기반으로 좌우 비대칭을 분석합니다.
+   * 좌우 비대칭 분석 결과 (통합 섹션에서 사용)
    */
   const asymmetryResults = useMemo((): AsymmetryResult[] => {
     if (!jointAngles) return [];
     return analyzeAllAsymmetry(jointAngles);
   }, [jointAngles]);
 
-  /**
-   * ROM 점수 (0~100)
-   * 정상 범위 내 관절 비율
-   */
-  const romScore = useMemo((): number => {
-    return calculateROMScore(romResults);
-  }, [romResults]);
-
-  /**
-   * 비대칭 점수 (0~100)
-   * 좌우 균형도 점수
-   */
-  const asymmetryScore = useMemo((): number => {
-    return calculateAsymmetryScore(asymmetryResults);
-  }, [asymmetryResults]);
-
-  /**
-   * 비대칭 요약 메시지
-   */
-  const asymmetrySummary = useMemo((): string => {
-    return getAsymmetrySummary(asymmetryResults);
-  }, [asymmetryResults]);
+  // ROM 분석 및 점수/요약은 통합 섹션으로 이동하여 미사용
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _romResults = useMemo((): ROMResult[] => {
+    if (!jointAngles) return [];
+    return analyzeAllROM(jointAngles);
+  }, [jointAngles]);
 
   // 분석 결과 저장 (Supabase)
   // ============================================================
@@ -1143,52 +1875,85 @@ export default function ResultPage() {
           animate="visible"
         >
           {/* ============================================================ */}
-          {/* 전체 자세 점수 요약 카드 */}
+          {/* 자세 유형 진단 카드 (원형 점수 + 유형 정보) */}
           {/* ============================================================ */}
           <motion.section variants={itemVariants}>
-            <div className="bg-card border border-border rounded-xl p-5 shadow-sm text-center">
-              <p className="text-sm text-muted-foreground mb-2">전체 자세 점수</p>
-              <p className={`text-4xl font-bold ${getSummaryScoreColor(summaryScore)}`}>
-                {summaryScore}점 <span className="text-lg font-normal text-muted-foreground">/ 100점</span>
-              </p>
-              <p className="text-muted-foreground mt-3">{getSummaryMessage(summaryScore)}</p>
-            </div>
+            <PostureTypeDiagnosisCard score={summaryScore} results={results} />
           </motion.section>
 
           {/* ============================================================ */}
-          {/* 거북목 위험도 카드 - 항상 표시 (간소화) */}
+          {/* 스켈레톤 정렬 시각화 (상세 각도 분석 + 좌우 균형 통합) */}
           {/* ============================================================ */}
-          <motion.section variants={itemVariants} className="space-y-3">
-            {diseaseRiskAnalysis.diseases.map((disease) => (
-              <div key={disease.id} className="bg-card border border-border rounded-xl shadow-sm p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      disease.level === 'low' ? 'bg-emerald-500/20' :
-                      disease.level === 'medium' ? 'bg-yellow-500/20' :
-                      disease.level === 'high' ? 'bg-orange-500/20' : 'bg-red-500/20'
-                    }`}>
-                      <HeartPulse className={`w-5 h-5 ${getRiskColorClass(disease.level)}`} />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-foreground">{disease.name}</p>
-                      <p className="text-xs text-muted-foreground">{disease.description}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={`text-2xl font-bold ${getRiskColorClass(disease.level)}`}>
-                      {disease.risk}%
-                    </span>
-                    <Badge variant={
-                      disease.level === 'low' ? 'default' :
-                      disease.level === 'medium' ? 'secondary' : 'destructive'
-                    } className="ml-2 text-[10px]">
-                      {getRiskLevelLabel(disease.level)}
-                    </Badge>
-                  </div>
-                </div>
+          {jointAngles && (
+            <motion.section variants={itemVariants}>
+              <SkeletonAlignmentVisualization
+                jointAngles={jointAngles}
+                asymmetryResults={asymmetryResults}
+                capturedImage={capturedImages?.front}
+              />
+            </motion.section>
+          )}
+
+          {/* ============================================================ */}
+          {/* 측정 항목 정의 테이블 */}
+          {/* ============================================================ */}
+          <motion.section variants={itemVariants}>
+            <div className="bg-card rounded-xl border border-slate-700 overflow-hidden">
+              {/* 헤더 */}
+              <div className="px-4 py-3 border-b border-slate-700 bg-muted/30">
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary" />
+                  측정 항목 정의
+                </h3>
               </div>
-            ))}
+
+              {/* 테이블 */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  {/* 테이블 헤더 */}
+                  <thead>
+                    <tr className="bg-slate-800/80 text-slate-400 text-[11px] font-medium">
+                      <th className="px-4 py-2.5 text-left">항목</th>
+                      <th className="px-4 py-2.5 text-left">정의</th>
+                      <th className="px-4 py-2.5 text-center whitespace-nowrap">정상 범위</th>
+                    </tr>
+                  </thead>
+                  {/* 테이블 바디 */}
+                  <tbody className="divide-y divide-slate-700/50">
+                    <tr className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-4 py-3 text-foreground font-medium whitespace-nowrap">어깨 좌우 기울기</td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">수평선과 양쪽 어깨를 연결하는 선 사이의 각도</td>
+                      <td className="px-4 py-3 text-center text-teal-400 font-medium whitespace-nowrap">0° ~ 2°</td>
+                    </tr>
+                    <tr className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-4 py-3 text-foreground font-medium whitespace-nowrap">골반 좌우 기울기</td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">수평선과 양쪽 대전자를 연결하는 선 사이의 각도</td>
+                      <td className="px-4 py-3 text-center text-teal-400 font-medium whitespace-nowrap">0° ~ 2°</td>
+                    </tr>
+                    <tr className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-4 py-3 text-foreground font-medium whitespace-nowrap">무릎 정렬</td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">양쪽 무릎의 높이 차이를 측정</td>
+                      <td className="px-4 py-3 text-center text-teal-400 font-medium whitespace-nowrap">0° ~ 2°</td>
+                    </tr>
+                    <tr className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-4 py-3 text-foreground font-medium whitespace-nowrap">목 앞뒤 편차</td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">어깨를 지나는 수직선과 귀 위치 사이의 앞뒤 편차</td>
+                      <td className="px-4 py-3 text-center text-teal-400 font-medium whitespace-nowrap">0 ~ 2.5cm</td>
+                    </tr>
+                    <tr className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-4 py-3 text-foreground font-medium whitespace-nowrap">흉추 후만각</td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">등의 굽은 정도를 각도로 측정</td>
+                      <td className="px-4 py-3 text-center text-teal-400 font-medium whitespace-nowrap">20° ~ 40°</td>
+                    </tr>
+                    <tr className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-4 py-3 text-foreground font-medium whitespace-nowrap">요추 전만각</td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">허리의 굽은 정도를 각도로 측정</td>
+                      <td className="px-4 py-3 text-center text-teal-400 font-medium whitespace-nowrap">30° ~ 45°</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </motion.section>
 
           {/* ============================================================ */}
@@ -1207,219 +1972,91 @@ export default function ResultPage() {
             )}
           </motion.section>
 
-          {/* ============================================================ */}
-          {/* 아코디언 섹션들 (기본 접힘) */}
-          {/* ============================================================ */}
-          <motion.section variants={itemVariants} className="space-y-4">
-
-            {/* 🦴 3D 스켈레톤 보기 - 추후 구현 예정으로 임시 숨김 */}
-            {/* TODO: OpenCap 스타일 3D 스켈레톤 제대로 구현 후 활성화 */}
-            {/*
-            <div className="border border-border rounded-xl overflow-hidden">
-              <button
-                onClick={() => setIsSkeletonOpen(!isSkeletonOpen)}
-                className="w-full p-4 flex justify-between items-center bg-card hover:bg-muted transition-colors"
-              >
-                <span className="font-medium text-foreground flex items-center gap-2">
-                  <Box className="w-4 h-4 text-blue-500" />
-                  3D 스켈레톤 보기
-                </span>
-                <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 ${isSkeletonOpen ? 'rotate-180' : ''}`} />
-              </button>
-              <AnimatePresence>
-                {isSkeletonOpen && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="border-t border-border bg-muted"
-                  >
-                    <div className="p-4">
-                      <div className="flex justify-center mb-4">
-                        <div className="flex gap-1 bg-card border p-1 rounded-lg">
-                          {(['front', 'side'] as const).map((view) => (
-                            <button
-                              key={view}
-                              onClick={() => setSkeleton3DView(view)}
-                              className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                                skeleton3DView === view
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'text-muted-foreground hover:bg-accent'
-                              }`}
-                            >
-                              {view === 'front' ? '정면' : '측면'}
-                            </button>
-                          ))}
-                        </div>
-                        <button
-                          onClick={() => setUse3DModel(!use3DModel)}
-                          className="ml-2 px-3 py-1.5 text-xs font-medium rounded-lg border bg-card hover:bg-muted"
-                        >
-                          {use3DModel ? '3D 모델' : '스틱'}
-                        </button>
-                      </div>
-                      <div className="flex justify-center">
-                        {displayLandmarks[skeleton3DView] ? (
-                          use3DModel ? (
-                            <Skeleton3DModel
-                              landmarks={displayLandmarks[skeleton3DView]}
-                              viewMode={skeleton3DView}
-                              width={320}
-                              height={400}
-                            />
-                          ) : (
-                            <Skeleton3D
-                              landmarks={displayLandmarks[skeleton3DView]}
-                              viewMode={skeleton3DView}
-                              width={320}
-                              height={400}
-                            />
-                          )
-                        ) : (
-                          <div className="w-[320px] h-[400px] bg-muted rounded-lg flex items-center justify-center">
-                            <p className="text-sm text-muted-foreground">데이터 없음</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-            */}
-
-            {/* 📐 상세 각도 분석 */}
-            {jointAngles && (
-              <div className="border border-border rounded-xl overflow-hidden">
-                <button
-                  onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-                  className="w-full p-4 flex justify-between items-center bg-card hover:bg-muted transition-colors"
-                >
-                  <span className="font-medium text-foreground flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-blue-500" />
-                    상세 각도 분석
-                    <span className="text-xs text-muted-foreground ml-1">ROM {romScore}%</span>
-                  </span>
-                  <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 ${isAdvancedOpen ? 'rotate-180' : ''}`} />
-                </button>
-                <AnimatePresence>
-                  {isAdvancedOpen && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="border-t border-border bg-muted"
-                    >
-                      <div className="p-4">
-                        <AdvancedReport
-                          jointAngles={jointAngles}
-                          romResults={romResults}
-                          asymmetryResults={asymmetryResults}
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-
-            {/* 좌우 균형 (별도 아코디언) */}
-            {asymmetryResults.length > 0 && (
-              <div className="border border-border rounded-xl overflow-hidden">
-                <button
-                  onClick={() => setIsBalanceOpen(!isBalanceOpen)}
-                  className="w-full p-4 flex justify-between items-center bg-card hover:bg-muted transition-colors"
-                >
-                  <span className="font-medium text-foreground flex items-center gap-2">
-                    <Scale className="w-4 h-4 text-blue-500" />
-                    좌우 균형
-                    <span className="text-xs text-muted-foreground ml-1">균형 {asymmetryScore}점</span>
-                  </span>
-                  <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 ${isBalanceOpen ? 'rotate-180' : ''}`} />
-                </button>
-                <AnimatePresence>
-                  {isBalanceOpen && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="border-t border-border bg-muted"
-                    >
-                      <div className="p-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          {/* [MVP] 어깨만 표시 - 고관절/무릎은 추후 활성화 */}
-                          {asymmetryResults
-                            .filter((asym) => asym.joint === '어깨')
-                            .map((asym, idx) => (
-                              <BalanceCard
-                                key={idx}
-                                label={asym.joint}
-                                percentDiff={asym.percentDiff}
-                                dominantSide={asym.dominantSide}
-                              />
-                            ))}
-                        </div>
-                        <Card className="mt-3 bg-card">
-                          <CardContent className="p-3">
-                            <p className="text-sm text-foreground">{asymmetrySummary}</p>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-
-            {/* 📊 항목별 상세 분석 */}
-            <div className="border border-border rounded-xl overflow-hidden">
-              <button
-                onClick={() => setIsDetailedOpen(!isDetailedOpen)}
-                className="w-full p-4 flex justify-between items-center bg-card hover:bg-muted transition-colors"
-              >
-                <span className="font-medium text-foreground flex items-center gap-2">
-                  <Target className="w-4 h-4 text-blue-500" />
-                  항목별 상세 분석
-                  <span className="text-xs text-muted-foreground ml-1">정상 {normalCount}개 · 주의 {warningCount}개</span>
-                </span>
-                <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 ${isDetailedOpen ? 'rotate-180' : ''}`} />
-              </button>
-              <AnimatePresence>
-                {isDetailedOpen && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="border-t border-border bg-muted"
-                  >
-                    <div className="p-4 space-y-3">
-                      {results.map((item, index) => (
-                        <AnalysisItemCard
-                          key={item.id}
-                          item={item}
-                          isOpen={openItemId === item.id}
-                          onToggle={() => handleToggleItem(item.id)}
-                          index={index}
-                        />
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-          </motion.section>
-
-          {/* 팁 카드 */}
+          {/* 맞춤 권장사항 카드 */}
           <motion.section variants={itemVariants}>
-            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-              <p className="text-sm text-blue-800">
-                <strong>💡 팁</strong> · 하루 10분씩 스트레칭을 하면 자세 개선에 효과적이에요!
-              </p>
+            <div className="bg-gradient-to-br from-teal-500/10 to-blue-500/10 border border-teal-500/30 rounded-xl p-5">
+              <h3 className="text-base font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Lightbulb className="w-5 h-5 text-teal-400" />
+                맞춤 권장사항
+              </h3>
+
+              <div className="space-y-3">
+                {/* 주의/위험 항목에 대한 권장사항 */}
+                {results.filter(item => item.grade === 'warning' || item.grade === 'danger').length > 0 ? (
+                  <>
+                    {results.filter(item => item.grade === 'warning' || item.grade === 'danger').map((item) => {
+                      // 항목별 맞춤 운동 추천
+                      const getRecommendation = () => {
+                        switch (item.id) {
+                          case 'forward_head':
+                            return {
+                              title: '거북목 교정 운동 권장',
+                              description: `목이 ${item.value}cm 앞으로 나와있어요. 목 스트레칭과 턱 당기기 운동을 추천합니다.`,
+                            };
+                          case 'shoulder_tilt':
+                            return {
+                              title: '어깨 교정 운동 권장',
+                              description: `어깨 불균형이 감지되었어요. 승모근 스트레칭과 어깨 회전 운동을 추천합니다.`,
+                            };
+                          case 'pelvis_tilt':
+                            return {
+                              title: '골반 교정 운동 권장',
+                              description: `골반 기울기가 ${item.value}° 입니다. 골반 스트레칭과 코어 강화 운동을 추천합니다.`,
+                            };
+                          case 'knee_angle':
+                            return {
+                              title: '무릎 정렬 운동 권장',
+                              description: `무릎 정렬에 주의가 필요해요. 하체 스트레칭과 균형 운동을 추천합니다.`,
+                            };
+                          default:
+                            return {
+                              title: '자세 교정 운동 권장',
+                              description: `${item.name} 항목에 주의가 필요합니다. 관련 스트레칭을 권장합니다.`,
+                            };
+                        }
+                      };
+                      const recommendation = getRecommendation();
+                      const isDanger = item.grade === 'danger';
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex items-start gap-3 bg-slate-800/50 rounded-lg p-4"
+                        >
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${isDanger ? 'bg-rose-500/20' : 'bg-amber-500/20'}`}>
+                            <AlertTriangle className={`w-3.5 h-3.5 ${isDanger ? 'text-rose-400' : 'text-amber-400'}`} />
+                          </div>
+                          <div>
+                            <p className={`font-medium ${isDanger ? 'text-rose-400' : 'text-amber-400'}`}>
+                              {recommendation.title}
+                            </p>
+                            <p className="text-sm text-slate-400 mt-0.5">
+                              {recommendation.description}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                ) : null}
+
+                {/* 정상 상태 메시지 */}
+                <div className="flex items-start gap-3 bg-slate-800/50 rounded-lg p-4">
+                  <div className="w-6 h-6 rounded-full bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-teal-400">
+                      {results.every(item => item.grade === 'good') ? '훌륭한 자세에요!' : '좋은 자세 유지'}
+                    </p>
+                    <p className="text-sm text-slate-400 mt-0.5">
+                      {results.every(item => item.grade === 'good')
+                        ? '모든 항목이 정상 범위에 있어요. 하루 10분씩 스트레칭으로 현재 상태를 유지하세요.'
+                        : '정상 항목들은 잘 유지되고 있어요. 꾸준한 스트레칭으로 자세를 개선해보세요.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </motion.section>
         </motion.div>
