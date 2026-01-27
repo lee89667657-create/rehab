@@ -40,6 +40,7 @@ import {
   calculateMedian,
 } from '@/lib/calibration';
 import { AngleSmoother } from '@/lib/smoothing';
+import { recordExercise } from '@/lib/streakSystem';
 import ROMBar from './ROMBar';
 
 // ============================================================
@@ -1194,6 +1195,9 @@ export default function RealTimeExercise({
 
     // localStorage에 저장
     saveExerciseResult(result);
+
+    // Streak 기록 (오늘 운동 완료 체크)
+    recordExercise();
 
     // 콜백 호출
     onComplete(result);

@@ -28,6 +28,7 @@ import {
   detectCurrentPose,
   saveExerciseResult,
 } from '@/lib/exerciseData';
+import { recordExercise } from '@/lib/streakSystem';
 
 // ============================================================
 // 타입 정의
@@ -400,6 +401,10 @@ export default function SequenceExercise({
     };
 
     saveExerciseResult(result);
+
+    // Streak 기록 (오늘 운동 완료 체크)
+    recordExercise();
+
     onComplete(result);
   }, [exercise, speak, onComplete]);
 

@@ -60,9 +60,10 @@ import {
   type AsymmetryResult,
   analyzeAllROM,
   analyzeAllAsymmetry,
-  calculateROMScore,
-  calculateAsymmetryScore,
-  getAsymmetrySummary,
+  // 추후 사용 예정
+  // calculateROMScore,
+  // calculateAsymmetryScore,
+  // getAsymmetrySummary,
 } from '@/lib/advancedAnalysis';
 
 // 고급 분석 리포트 컴포넌트 (통합 섹션으로 이동하여 현재 미사용)
@@ -392,6 +393,7 @@ interface AnalysisItemRowProps {
   itemType: 'shoulder' | 'hip' | 'knee' | 'neck' | 'thoracic' | 'lumbar';
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function AnalysisItemRow({ label, value, unit, status, itemType }: AnalysisItemRowProps) {
   // 상태별 색상
   const valueColor = status === 'danger' ? 'text-rose-400' : status === 'warning' ? 'text-amber-400' : 'text-teal-400';
@@ -509,6 +511,7 @@ interface BalanceVisualizationProps {
   dominantSide?: 'left' | 'right' | 'balanced';
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function BalanceVisualization({ title, percentDiff, dominantSide }: BalanceVisualizationProps) {
   const status: 'normal' | 'warning' | 'danger' = percentDiff <= 2 ? 'normal' : percentDiff <= 5 ? 'warning' : 'danger';
   const valueColor = status === 'danger' ? 'text-rose-400' : status === 'warning' ? 'text-amber-400' : 'text-teal-400';
@@ -612,17 +615,24 @@ function SkeletonAlignmentVisualization({ jointAngles, asymmetryResults, sideLan
   const kneeExtensionStatus: 'normal' | 'warning' | 'danger' = kneeExtensionAngle <= 180 ? 'normal' : kneeExtensionAngle <= 185 ? 'warning' : 'danger';
 
   // 기존 변수 호환용 (다른 곳에서 사용)
-  const cvaAngle = forwardHeadAngle;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _cvaAngle = forwardHeadAngle;
   const neckForwardDistance = forwardHeadAngle / 4; // cm 환산 근사값
-  const thoracicKyphosis = Number((angles.trunk * 1.5 + 25).toFixed(1));
-  const thoracicStatus: 'normal' | 'warning' | 'danger' = thoracicKyphosis <= 40 ? 'normal' : thoracicKyphosis <= 50 ? 'warning' : 'danger';
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _thoracicKyphosis = Number((angles.trunk * 1.5 + 25).toFixed(1));
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _thoracicStatus: 'normal' | 'warning' | 'danger' = _thoracicKyphosis <= 40 ? 'normal' : _thoracicKyphosis <= 50 ? 'warning' : 'danger';
 
   // ===== 균형 계산 =====
-  const shoulderBalance = asymmetryResults?.find(a => a.joint === '어깨');
-  const frontBalancePercent = shoulderBalance?.percentDiff ?? Math.abs(shoulderTiltAngle) * 0.8;
-  const frontBalanceSide = shoulderTiltAngle > 0 ? 'left' : shoulderTiltAngle < 0 ? 'right' : 'balanced';
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _shoulderBalance = asymmetryResults?.find(a => a.joint === '어깨');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _frontBalancePercent = _shoulderBalance?.percentDiff ?? Math.abs(shoulderTiltAngle) * 0.8;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _frontBalanceSide = shoulderTiltAngle > 0 ? 'left' : shoulderTiltAngle < 0 ? 'right' : 'balanced';
 
-  const sideBalancePercent = neckForwardDistance * 0.6;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _sideBalancePercent = neckForwardDistance * 0.6;
 
   // ===== 색상 =====
   const colors = {
@@ -651,7 +661,8 @@ function SkeletonAlignmentVisualization({ jointAngles, asymmetryResults, sideLan
   const hRightY = f.hipY + hipTiltAngle * 1.2;
   const kLeftY = f.kneeY - kneeTiltAngle * 1.0;
   const kRightY = f.kneeY + kneeTiltAngle * 1.0;
-  const headOffset = neckForwardDistance * 2.5;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _headOffset = neckForwardDistance * 2.5;
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -1398,6 +1409,7 @@ function _BodyDiagram({ items }: { items: AnalysisItem[] }) {
 // 컴포넌트: 분석 항목 카드
 // ============================================================
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function AnalysisItemCard({
   item,
   isOpen,
@@ -2098,7 +2110,8 @@ export default function ResultPage() {
     return { text: '교정 필요', sub: '꾸준한 관리가 필요해요' };
   };
 
-  const handleToggleItem = (itemId: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _handleToggleItem = (itemId: string) => {
     setOpenItemId(openItemId === itemId ? null : itemId);
   };
 
@@ -2106,10 +2119,12 @@ export default function ResultPage() {
     alert('PDF 리포트 다운로드 기능은 추후 업데이트 예정입니다.');
   }, []);
 
-  const normalCount = results.filter((item) => item.grade === 'good').length;
-  const warningCount = results.filter((item) => item.grade !== 'good').length;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const scoreMessage = getScoreMessage(overallScore);
+  const _normalCount = results.filter((item) => item.grade === 'good').length;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _warningCount = results.filter((item) => item.grade !== 'good').length;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _scoreMessage = getScoreMessage(overallScore);
 
   // ============================================================
   // 전체 자세 점수 (요약 카드용) - 실제 분석 점수 사용
@@ -2118,7 +2133,8 @@ export default function ResultPage() {
   // 수정: poseAnalysis에서 계산된 실제 overallScore 사용
   const summaryScore = overallScore;
 
-  const getSummaryMessage = (score: number): string => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _getSummaryMessage = (score: number): string => {
     if (score >= 90) return '매우 좋은 자세예요!';
     if (score >= 75) return '양호한 자세예요';
     if (score >= 65) return '평균적인 자세예요';
@@ -2127,7 +2143,8 @@ export default function ResultPage() {
     return '교정이 필요해요';
   };
 
-  const getSummaryScoreColor = (score: number): string => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _getSummaryScoreColor = (score: number): string => {
     if (score >= 75) return 'text-teal-500';
     if (score >= 60) return 'text-amber-500';
     return 'text-rose-500';

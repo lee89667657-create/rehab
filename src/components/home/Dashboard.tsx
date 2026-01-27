@@ -23,10 +23,29 @@ import {
   MoveVertical,
   LucideIcon,
   Target,
+  Trophy,
+  Flame,
+  Award,
 } from 'lucide-react';
 import useStore, { useAnalysisResult } from '@/store/useStore';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getWeeklyRecords } from '@/lib/supabase';
+import { BadgeGrid } from '@/components/badges';
+import {
+  BADGE_DEFINITIONS,
+  loadBadges,
+  saveBadges,
+  updateBadges,
+  getEarnedBadgeCount,
+} from '@/lib/badgeSystem';
+import type { UserBadge, BadgeCheckContext } from '@/types/badges';
+import {
+  loadStreakData,
+  getWeeklyProgress,
+  syncToSupabase,
+  type StreakData,
+  type WeeklyProgress,
+} from '@/lib/streakSystem';
 // AppHeader는 SidebarLayout에서 처리됨
 import { LOWER_BODY_ANALYSIS_ENABLED } from '@/constants/features';
 
@@ -223,6 +242,7 @@ export default function Dashboard() {
   const storeAnalysisResult = useAnalysisResult();
   const currentExerciseIndex = useStore((state) => state.currentExerciseIndex);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [weeklyRecord, setWeeklyRecord] = useState<WeeklyRecordItem[]>(() =>
     getDefaultWeeklyRecord()
   );
@@ -231,6 +251,10 @@ export default function Dashboard() {
     overallScore: number;
     items: Array<{ id: string; name: string; grade: string; score: number }>;
   } | null>(null);
+  const [userBadges, setUserBadges] = useState<UserBadge[]>([]);
+  const [isBadgesOpen, setIsBadgesOpen] = useState(false);
+  const [streakData, setStreakData] = useState<StreakData | null>(null);
+  const [weeklyProgress, setWeeklyProgress] = useState<WeeklyProgress[]>([]);
   // Supabase에서 가져온 전체 레코드 (클릭 시 localStorage에 저장용)
   const [latestAnalysisRecord, setLatestAnalysisRecord] = useState<{
     id: string;
@@ -305,10 +329,49 @@ export default function Dashboard() {
     fetchWeeklyRecords();
   }, [user]);
 
+  // Streak 데이터 로드
+  useEffect(() => {
+    const streak = loadStreakData();
+    setStreakData(streak);
+    setWeeklyProgress(getWeeklyProgress());
+  }, []);
+
+  // Supabase 동기화 (로그인 유저)
+  useEffect(() => {
+    if (user && streakData) {
+      syncToSupabase(user.id).catch(console.error);
+    }
+  }, [user, streakData]);
+
   // store 또는 Supabase에서 가져온 분석 결과 사용
   const analysisResult = storeAnalysisResult || latestAnalysis;
-  
-  const completedDays = weeklyRecord.filter((r) => r.completed).length;
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const completedDays = weeklyProgress.filter((r) => r.completed).length;
+
+  // 뱃지 로드 및 업데이트
+  useEffect(() => {
+    if (!user) return;
+
+    // 뱃지 로드
+    const badges = loadBadges(user.id);
+
+    // 뱃지 달성 조건 체크를 위한 컨텍스트 생성
+    const context: BadgeCheckContext = {
+      totalAnalyses: latestAnalysisRecord ? 1 : 0, // 분석 기록이 있으면 1 이상
+      currentStreak: streakData?.currentStreak || 0,
+      latestScore: latestAnalysis?.overallScore || 0,
+      previousScore: null, // TODO: 이전 점수 비교 로직 추가
+      headForwardScore: latestAnalysis?.items.find(i => i.id === 'forward_head')?.score || 0,
+      shoulderBalanceScore: latestAnalysis?.items.find(i => i.id === 'shoulder_tilt')?.score || 0,
+      overallScore: latestAnalysis?.overallScore || 0,
+    };
+
+    // 뱃지 업데이트
+    const { badges: updatedBadges } = updateBadges(badges, context);
+    setUserBadges(updatedBadges);
+    saveBadges(user.id, updatedBadges);
+  }, [user, latestAnalysis, latestAnalysisRecord, streakData]);
   const overallScore = analysisResult?.overallScore ?? 0;
   const scoreMessage = getScoreMessage(overallScore);
 
@@ -510,9 +573,14 @@ export default function Dashboard() {
                 onClick={() => setIsWeeklyOpen(!isWeeklyOpen)}
                 className="w-full p-4 flex justify-between items-center hover:bg-accent transition-colors"
               >
-                <span className="font-semibold text-foreground text-sm">이번 주 기록</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-blue-500 font-medium">{Math.round((completedDays / 7) * 100)}%</span>
+                  <Flame className={`w-4 h-4 ${(streakData?.currentStreak || 0) > 0 ? 'text-orange-500' : 'text-muted-foreground'}`} />
+                  <span className="font-semibold text-foreground text-sm">이번 주 기록</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {(streakData?.currentStreak || 0) > 0 && (
+                    <span className="text-sm text-orange-500 font-medium">{streakData?.currentStreak}일 연속</span>
+                  )}
                   <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isWeeklyOpen ? 'rotate-180' : ''}`} />
                 </div>
               </button>
@@ -525,40 +593,108 @@ export default function Dashboard() {
                     transition={{ duration: 0.2 }}
                     className="border-t border-border"
                   >
-                    <div className="p-4 pt-3">
-                      {/* 주간 막대 - 작은 버전 */}
-                      <div className="flex justify-between items-end gap-1.5">
-                        {weeklyRecord.map((record) => (
-                          <div key={record.date} className="flex flex-col items-center gap-1 flex-1">
-                            <div
-                              className={`w-full max-w-[24px] h-8 rounded ${
-                                record.completed
-                                  ? 'bg-blue-500/100'
-                                  : record.isToday
-                                    ? 'bg-blue-500/100/30'
-                                    : 'bg-muted'
-                              }`}
-                            />
-                            <span
-                              className={`text-[10px] ${
-                                record.isToday
-                                  ? 'text-blue-500 font-semibold'
-                                  : 'text-muted-foreground'
-                              }`}
-                            >
-                              {record.day}
+                    <div className="p-4 pt-3 space-y-4">
+                      {/* 연속 운동 현황 */}
+                      {(streakData?.currentStreak || 0) > 0 && (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Flame className="w-5 h-5 text-orange-500" />
+                            <span className="text-sm font-medium text-foreground">
+                              {streakData?.currentStreak}일 연속 운동 중
                             </span>
                           </div>
-                        ))}
+                          {(streakData?.bestStreak || 0) > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <Award className="w-4 h-4 text-yellow-500" />
+                              <span className="text-xs text-muted-foreground">
+                                최고 기록: {streakData?.bestStreak}일
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 주간 진행 바 */}
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">이번 주 운동 현황</p>
+                        <div className="flex gap-1.5">
+                          {weeklyProgress.map((day) => (
+                            <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
+                              <div
+                                className={`w-full h-6 rounded ${
+                                  day.completed
+                                    ? 'bg-blue-500'
+                                    : day.isToday
+                                      ? 'bg-blue-500/30 border border-blue-500/50 border-dashed'
+                                      : 'bg-muted'
+                                }`}
+                              />
+                              <span
+                                className={`text-[10px] ${
+                                  day.isToday
+                                    ? 'text-blue-500 font-semibold'
+                                    : day.completed
+                                      ? 'text-foreground'
+                                      : 'text-muted-foreground'
+                                }`}
+                              >
+                                {day.day}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
 
                       {/* 통계 링크 */}
-                      <div className="mt-3 flex justify-end">
+                      <div className="flex justify-end">
                         <Link href="/stats" className="text-xs text-muted-foreground hover:text-blue-500 flex items-center gap-1 transition-colors">
                           통계 보기
                           <ChevronRight className="w-3 h-3" />
                         </Link>
                       </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.section>
+
+          {/* 내 뱃지 - 아코디언 */}
+          <motion.section variants={itemVariants}>
+            <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+              <button
+                onClick={() => setIsBadgesOpen(!isBadgesOpen)}
+                className="w-full p-4 flex justify-between items-center hover:bg-accent transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-yellow-500" />
+                  <span className="font-semibold text-foreground text-sm">내 뱃지</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-yellow-500 font-medium">
+                    {getEarnedBadgeCount(userBadges)}/{BADGE_DEFINITIONS.length}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isBadgesOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+              <AnimatePresence>
+                {isBadgesOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="border-t border-border"
+                  >
+                    <div className="p-4">
+                      <BadgeGrid
+                        badges={BADGE_DEFINITIONS.map(def => ({
+                          definition: def,
+                          userBadge: userBadges.find(b => b.id === def.id) || { id: def.id, earnedAt: null },
+                        }))}
+                        columns={2}
+                        size="sm"
+                      />
                     </div>
                   </motion.div>
                 )}

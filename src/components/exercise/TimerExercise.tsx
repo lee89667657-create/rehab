@@ -27,6 +27,7 @@ import {
   type ExerciseResult,
   saveExerciseResult,
 } from '@/lib/exerciseData';
+import { recordExercise } from '@/lib/streakSystem';
 
 // ============================================================
 // 타입 정의
@@ -273,6 +274,9 @@ export default function TimerExercise({
 
     // localStorage에 저장
     saveExerciseResult(result);
+
+    // Streak 기록 (오늘 운동 완료 체크)
+    recordExercise();
 
     // 콜백 호출
     onComplete(result);
