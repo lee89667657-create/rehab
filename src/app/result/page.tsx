@@ -288,6 +288,7 @@ interface SkeletonAlignmentProps {
   jointAngles: JointAngles | null;
   asymmetryResults?: AsymmetryResult[];
   capturedImage?: string | null;
+  sideLandmarks?: { x: number; y: number; z: number; visibility: number }[];
 }
 
 // ============================================================
@@ -548,34 +549,73 @@ function BalanceVisualization({ title, percentDiff, dominantSide }: BalanceVisua
   );
 }
 
-function SkeletonAlignmentVisualization({ jointAngles, asymmetryResults }: SkeletonAlignmentProps) {
+function SkeletonAlignmentVisualization({ jointAngles, asymmetryResults, sideLandmarks }: SkeletonAlignmentProps) {
   const [frontImageError, setFrontImageError] = useState(false);
   const [sideImageError, setSideImageError] = useState(false);
 
-  if (!jointAngles) return null;
+  // jointAngles가 없으면 기본값 사용 (모든 각도 0)
+  const angles: JointAngles = jointAngles || {
+    shoulderLeft: 0,
+    shoulderRight: 0,
+    hipLeft: 0,
+    hipRight: 0,
+    kneeLeft: 0,
+    kneeRight: 0,
+    neck: 0,
+    trunk: 0
+  };
 
   // ===== 정면 측정값 계산 =====
-  const shoulderDiff = jointAngles.shoulderLeft - jointAngles.shoulderRight;
+  const shoulderDiff = angles.shoulderLeft - angles.shoulderRight;
   const shoulderTiltAngle = Number((shoulderDiff / 2).toFixed(1));
   const shoulderStatus: 'normal' | 'warning' | 'danger' = Math.abs(shoulderTiltAngle) <= 2 ? 'normal' : Math.abs(shoulderTiltAngle) <= 5 ? 'warning' : 'danger';
 
-  const hipDiff = jointAngles.hipLeft - jointAngles.hipRight;
+  const hipDiff = angles.hipLeft - angles.hipRight;
   const hipTiltAngle = Number((hipDiff / 5).toFixed(1));
   const hipStatus: 'normal' | 'warning' | 'danger' = Math.abs(hipTiltAngle) <= 2 ? 'normal' : Math.abs(hipTiltAngle) <= 5 ? 'warning' : 'danger';
 
-  const kneeDiff = jointAngles.kneeLeft - jointAngles.kneeRight;
+  const kneeDiff = angles.kneeLeft - angles.kneeRight;
   const kneeTiltAngle = Number((kneeDiff / 3).toFixed(1));
   const kneeStatus: 'normal' | 'warning' | 'danger' = Math.abs(kneeTiltAngle) <= 2 ? 'normal' : Math.abs(kneeTiltAngle) <= 5 ? 'warning' : 'danger';
 
   // ===== 측면 측정값 계산 =====
-  const neckForwardDistance = Number((jointAngles.neck * 0.3).toFixed(1));
-  const neckStatus: 'normal' | 'warning' | 'danger' = neckForwardDistance <= 2.5 ? 'normal' : neckForwardDistance <= 5 ? 'warning' : 'danger';
+  // 거북목 각도 (FHA: Forward Head Angle) - 귀와 어깨 수직선 기준 전방 각도
+  // 0° = 정상 (귀가 어깨 바로 위), 15°+ = 거북목
+  const earX = sideLandmarks?.[7]?.x ?? 0.5;
+  const shoulderX = sideLandmarks?.[11]?.x ?? 0.5;
+  const forwardHeadAngle = Number((Math.max(0, (earX - shoulderX)) * 100).toFixed(1)); // 전방 이동 정도를 각도로 변환
+  const neckStatus: 'normal' | 'warning' | 'danger' = forwardHeadAngle <= 15 ? 'normal' : forwardHeadAngle <= 30 ? 'warning' : 'danger';
 
-  const thoracicKyphosis = Number((jointAngles.trunk * 1.5 + 25).toFixed(1));
-  const thoracicStatus: 'normal' | 'warning' | 'danger' = thoracicKyphosis <= 40 ? 'normal' : thoracicKyphosis <= 50 ? 'warning' : 'danger';
-
-  const lumbarLordosis = Number((45 - jointAngles.trunk * 0.8).toFixed(1));
+  // 허리 전만각 (Lumbar Lordosis)
+  const lumbarLordosis = Number((45 - angles.trunk * 0.8).toFixed(1));
   const lumbarStatus: 'normal' | 'warning' | 'danger' = lumbarLordosis >= 30 && lumbarLordosis <= 45 ? 'normal' : lumbarLordosis >= 20 && lumbarLordosis <= 55 ? 'warning' : 'danger';
+
+  // 무릎 신전 각도 (Knee Extension Angle) - 측면 랜드마크 기반 계산
+  // 골반(23), 무릎(25), 발목(27) 좌표로 실제 각도 계산
+  const hipLm = sideLandmarks?.[23];
+  const kneeLm = sideLandmarks?.[25];
+  const ankleLm = sideLandmarks?.[27];
+  let kneeExtensionAngle = 175; // 기본값
+  if (hipLm && kneeLm && ankleLm) {
+    // 두 벡터의 각도 계산: 골반→무릎, 무릎→발목
+    const v1 = { x: hipLm.x - kneeLm.x, y: hipLm.y - kneeLm.y };
+    const v2 = { x: ankleLm.x - kneeLm.x, y: ankleLm.y - kneeLm.y };
+    const dot = v1.x * v2.x + v1.y * v2.y;
+    const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+    const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+    if (mag1 > 0 && mag2 > 0) {
+      const cosAngle = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
+      kneeExtensionAngle = Number((180 - Math.acos(cosAngle) * 180 / Math.PI).toFixed(1));
+    }
+  }
+  // 175-180° = 정상, 180°+ = 과신전
+  const kneeExtensionStatus: 'normal' | 'warning' | 'danger' = kneeExtensionAngle <= 180 ? 'normal' : kneeExtensionAngle <= 185 ? 'warning' : 'danger';
+
+  // 기존 변수 호환용 (다른 곳에서 사용)
+  const cvaAngle = forwardHeadAngle;
+  const neckForwardDistance = forwardHeadAngle / 4; // cm 환산 근사값
+  const thoracicKyphosis = Number((angles.trunk * 1.5 + 25).toFixed(1));
+  const thoracicStatus: 'normal' | 'warning' | 'danger' = thoracicKyphosis <= 40 ? 'normal' : thoracicKyphosis <= 50 ? 'warning' : 'danger';
 
   // ===== 균형 계산 =====
   const shoulderBalance = asymmetryResults?.find(a => a.joint === '어깨');
@@ -596,14 +636,13 @@ function SkeletonAlignmentVisualization({ jointAngles, asymmetryResults }: Skele
 
   // ===== SVG 좌표 (180x400 이미지 기준, viewBox 100x220) =====
   const vw = 100, vh = 220;
-  const cx = 54; // 골격 척추 중심이 오른쪽에 있어서 조정
+  const cx = 50; // 중앙 정렬 (좌우 대칭)
 
-  // 정면 좌표 (골격 이미지 실제 관절 위치에 맞춤)
-  const f = { shoulderY: 52, hipY: 115, kneeY: 162, sw: 18, hw: 14, kw: 10 };
-  // 측면 좌표
-  // 측면 좌표 (viewBox 100x220 기준, 골격 이미지에 맞춤)
-  const cxSide = 48; // 측면 골격은 중앙보다 약간 왼쪽
-  const s = { earY: 38, shoulderY: 55, thoracicY: 80, lumbarY: 105, hipY: 120 };
+  // 정면 좌표 (사용자 측정 기반) - 좌우 대칭
+  const f = { shoulderY: 52, hipY: 88, kneeY: 130, sw: 12, hw: 9, kw: 7 };
+  // 측면 좌표 (사용자 측정 기반)
+  const cxSide = 42; // 측면 골격은 중앙보다 왼쪽(뒤쪽)으로 조정
+  const s = { earY: 38, neckY: 44, shoulderY: 50, thoracicY: 58, lumbarY: 75, hipY: 88, kneeY: 130, ankleY: 175 };
 
   // 기울기 적용
   const sLeftY = f.shoulderY - shoulderTiltAngle * 1.2;
@@ -625,7 +664,7 @@ function SkeletonAlignmentVisualization({ jointAngles, asymmetryResults }: Skele
       </div>
 
       <div className="p-4 space-y-6">
-        {/* ==================== 정면 섹션 ==================== */}
+        {/* ==================== 정면 섹션 (에버엑스 스타일) ==================== */}
         <div>
           <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
@@ -633,7 +672,7 @@ function SkeletonAlignmentVisualization({ jointAngles, asymmetryResults }: Skele
           </p>
 
           <div className="flex gap-4">
-            {/* 정면 골격 이미지 */}
+            {/* 왼쪽: 정면 전신 이미지 + 마커/라인 오버레이 */}
             <div
               className="relative rounded-xl overflow-hidden border border-border/50 flex-shrink-0 bg-gradient-to-b from-slate-800 to-slate-900"
               style={{ width: '180px', height: '400px' }}
@@ -648,96 +687,171 @@ function SkeletonAlignmentVisualization({ jointAngles, asymmetryResults }: Skele
                 />
               )}
 
-              {/* SVG 오버레이 */}
+              {/* SVG 오버레이 - 깔끔한 라인 스타일 */}
               <svg viewBox={`0 0 ${vw} ${vh}`} className="absolute inset-0 w-full h-full" style={{ zIndex: 10 }}>
-                <defs>
-                  <pattern id="grid-front" width="10" height="10" patternUnits="userSpaceOnUse">
-                    <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#grid-front)" />
+                {/* 중앙 기준선 */}
+                <line x1={cx} y1="30" x2={cx} y2={vh - 25} stroke={colors.reference} strokeWidth="0.5" strokeDasharray="2 2" opacity="0.25" />
 
-                {/* 기준선 */}
-                <line x1={cx} y1="15" x2={cx} y2={vh - 10} stroke={colors.reference} strokeWidth="0.8" strokeDasharray="3 2" opacity="0.4" />
+                {/* ===== 어깨 좌우 기울기 ===== */}
+                {/* 수평 기준선 (점선) */}
+                <line x1={cx - f.sw} y1={f.shoulderY} x2={cx + f.sw} y2={f.shoulderY} stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" strokeDasharray="2 1" />
+                {/* 실제 어깨 라인 */}
+                <line x1={cx - f.sw} y1={sLeftY} x2={cx + f.sw} y2={sRightY} stroke={getStatusColor(shoulderStatus)} strokeWidth="0.8" />
+                {/* 마커 */}
+                <circle cx={cx - f.sw} cy={sLeftY} r="1.5" fill={getStatusColor(shoulderStatus)} />
+                <circle cx={cx + f.sw} cy={sRightY} r="1.5" fill={getStatusColor(shoulderStatus)} />
 
-                {/* 어깨 */}
-                <line x1={cx - f.sw} y1={sLeftY} x2={cx + f.sw} y2={sRightY} stroke={getStatusColor(shoulderStatus)} strokeWidth="2" />
-                <circle cx={cx - f.sw} cy={sLeftY} r="4" fill={getStatusColor(shoulderStatus)} />
-                <circle cx={cx + f.sw} cy={sRightY} r="4" fill={getStatusColor(shoulderStatus)} />
+                {/* ===== 골반 좌우 기울기 ===== */}
+                {/* 수평 기준선 (점선) */}
+                <line x1={cx - f.hw} y1={f.hipY} x2={cx + f.hw} y2={f.hipY} stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" strokeDasharray="2 1" />
+                {/* 실제 골반 라인 */}
+                <line x1={cx - f.hw} y1={hLeftY} x2={cx + f.hw} y2={hRightY} stroke={getStatusColor(hipStatus)} strokeWidth="0.8" />
+                {/* 마커 */}
+                <circle cx={cx - f.hw} cy={hLeftY} r="1.5" fill={getStatusColor(hipStatus)} />
+                <circle cx={cx + f.hw} cy={hRightY} r="1.5" fill={getStatusColor(hipStatus)} />
 
-                {/* 골반 */}
-                <line x1={cx - f.hw} y1={hLeftY} x2={cx + f.hw} y2={hRightY} stroke={getStatusColor(hipStatus)} strokeWidth="2" />
-                <circle cx={cx - f.hw} cy={hLeftY} r="4" fill={getStatusColor(hipStatus)} />
-                <circle cx={cx + f.hw} cy={hRightY} r="4" fill={getStatusColor(hipStatus)} />
+                {/* ===== 무릎 좌우 정렬 ===== */}
+                {/* 수평 기준선 (점선) */}
+                <line x1={cx - f.kw} y1={f.kneeY} x2={cx + f.kw} y2={f.kneeY} stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" strokeDasharray="2 1" />
+                {/* 실제 무릎 라인 */}
+                <line x1={cx - f.kw} y1={kLeftY} x2={cx + f.kw} y2={kRightY} stroke={getStatusColor(kneeStatus)} strokeWidth="0.8" />
+                {/* 마커 */}
+                <circle cx={cx - f.kw} cy={kLeftY} r="1.5" fill={getStatusColor(kneeStatus)} />
+                <circle cx={cx + f.kw} cy={kRightY} r="1.5" fill={getStatusColor(kneeStatus)} />
 
-                {/* 무릎 */}
-                <line x1={cx - f.kw} y1={kLeftY} x2={cx + f.kw} y2={kRightY} stroke={getStatusColor(kneeStatus)} strokeWidth="2" />
-                <circle cx={cx - f.kw} cy={kLeftY} r="3.5" fill={getStatusColor(kneeStatus)} />
-                <circle cx={cx + f.kw} cy={kRightY} r="3.5" fill={getStatusColor(kneeStatus)} />
-
-                {/* 좌/우 라벨 */}
-                <text x="6" y="12" fontSize="8" fill="rgba(255,255,255,0.5)" fontWeight="600">좌</text>
-                <text x={vw - 14} y="12" fontSize="8" fill="rgba(255,255,255,0.5)" fontWeight="600">우</text>
+                {/* 라벨 */}
+                <text x="6" y="14" fontSize="6" fill="rgba(255,255,255,0.35)" fontWeight="500">좌</text>
+                <text x={vw - 10} y="14" fontSize="6" fill="rgba(255,255,255,0.35)" fontWeight="500">우</text>
               </svg>
             </div>
 
-            {/* 정면 상세 분석 - 테이블 형식 */}
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-medium text-muted-foreground mb-2">몸 기울이기 · 좌우</p>
-              <div className="rounded-lg border border-slate-700/50 overflow-hidden">
-                {/* 테이블 헤더 */}
-                <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2 bg-slate-800/80 text-[10px] font-medium text-slate-400">
-                  <span>측정 항목</span>
-                  <span className="text-center">측정값</span>
-                  <span className="text-center">상태</span>
-                  <span>분석</span>
-                </div>
-                {/* 테이블 바디 */}
-                <div className="divide-y divide-slate-700/50">
-                  {/* 어깨 */}
-                  <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2.5 items-center hover:bg-slate-800/30 transition-colors">
-                    <span className="text-xs text-foreground">어깨 좌우 기울기</span>
-                    <span className={`text-sm font-bold text-center ${shoulderStatus === 'normal' ? 'text-teal-400' : shoulderStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>
-                      {Math.abs(shoulderTiltAngle)}°
-                    </span>
-                    <span className="flex justify-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${shoulderStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : shoulderStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+            {/* 오른쪽: 부위별 분석 카드 3개 (세로 배치) */}
+            <div className="flex-1 flex flex-col gap-2.5">
+              {/* 어깨 기울기 카드 */}
+              <div className={`rounded-lg border p-3 ${shoulderStatus === 'normal' ? 'border-teal-500/30 bg-teal-500/5' : shoulderStatus === 'warning' ? 'border-amber-500/30 bg-amber-500/5' : 'border-rose-500/30 bg-rose-500/5'}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${shoulderStatus === 'normal' ? 'bg-teal-500/20' : shoulderStatus === 'warning' ? 'bg-amber-500/20' : 'bg-rose-500/20'}`}>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke={getStatusColor(shoulderStatus)} strokeWidth="2">
+                      <path d="M4 12h16M4 12l4-4M4 12l4 4M20 12l-4-4M20 12l-4 4" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-foreground">어깨 기울기</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${shoulderStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : shoulderStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
                         {shoulderStatus === 'normal' ? '정상' : shoulderStatus === 'warning' ? '주의' : '위험'}
                       </span>
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {Math.abs(shoulderTiltAngle) <= 2 ? '균형이 잘 잡혀있어요' : shoulderTiltAngle > 0 ? '왼쪽 어깨가 올라가 있어요' : '오른쪽 어깨가 올라가 있어요'}
-                    </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mb-2">
+                      어깨 좌우 기울기가 <span className={`font-bold ${shoulderStatus === 'normal' ? 'text-teal-400' : shoulderStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>{Math.abs(shoulderTiltAngle)}°</span>로 {shoulderStatus === 'normal' ? '정상' : shoulderStatus === 'warning' ? '경미한 불균형' : '심한 불균형'} 단계입니다
+                    </p>
+                    {/* 게이지바 (0-10° 범위, 0-3° 정상) + 마커 */}
+                    <div className="relative h-2 bg-slate-700/50 rounded-full">
+                      {/* 정상 범위 배경 (0-3°) */}
+                      <div className="absolute left-0 top-0 h-full rounded-l-full bg-teal-500/20" style={{ width: '30%' }} />
+                      {/* 주의 범위 배경 (3-5°) */}
+                      <div className="absolute left-[30%] top-0 h-full bg-amber-500/10" style={{ width: '20%' }} />
+                      {/* 현재 위치 마커 */}
+                      <div
+                        className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white shadow-md transition-all ${shoulderStatus === 'normal' ? 'bg-teal-400' : shoulderStatus === 'warning' ? 'bg-amber-400' : 'bg-rose-400'}`}
+                        style={{ left: `calc(${Math.min(100, Math.max(0, Math.abs(shoulderTiltAngle) / 10 * 100))}% - 6px)` }}
+                      />
+                      {/* 기준선 */}
+                      <div className="absolute top-0 left-[30%] w-px h-full bg-white/50" title="정상 기준 (3°)" />
+                      <div className="absolute top-0 left-[50%] w-px h-full bg-white/30" title="주의 기준 (5°)" />
+                    </div>
+                    <div className="flex justify-between mt-1 text-[9px] text-muted-foreground">
+                      <span>0°</span>
+                      <span className="text-teal-400/70">3°</span>
+                      <span>10°</span>
+                    </div>
                   </div>
-                  {/* 골반 */}
-                  <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2.5 items-center hover:bg-slate-800/30 transition-colors">
-                    <span className="text-xs text-foreground">골반 좌우 기울기</span>
-                    <span className={`text-sm font-bold text-center ${hipStatus === 'normal' ? 'text-teal-400' : hipStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>
-                      {Math.abs(hipTiltAngle)}°
-                    </span>
-                    <span className="flex justify-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${hipStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : hipStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                </div>
+              </div>
+
+              {/* 골반 기울기 카드 */}
+              <div className={`rounded-lg border p-3 ${hipStatus === 'normal' ? 'border-teal-500/30 bg-teal-500/5' : hipStatus === 'warning' ? 'border-amber-500/30 bg-amber-500/5' : 'border-rose-500/30 bg-rose-500/5'}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${hipStatus === 'normal' ? 'bg-teal-500/20' : hipStatus === 'warning' ? 'bg-amber-500/20' : 'bg-rose-500/20'}`}>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke={getStatusColor(hipStatus)} strokeWidth="2">
+                      <ellipse cx="12" cy="12" rx="8" ry="4" />
+                      <line x1="12" y1="8" x2="12" y2="16" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-foreground">골반 기울기</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${hipStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : hipStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
                         {hipStatus === 'normal' ? '정상' : hipStatus === 'warning' ? '주의' : '위험'}
                       </span>
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {Math.abs(hipTiltAngle) <= 2 ? '골반이 수평이에요' : hipTiltAngle > 0 ? '골반이 좌측으로 기울어져 있어요' : '골반이 우측으로 기울어져 있어요'}
-                    </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mb-2">
+                      골반 좌우 기울기가 <span className={`font-bold ${hipStatus === 'normal' ? 'text-teal-400' : hipStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>{Math.abs(hipTiltAngle)}°</span>로 {hipStatus === 'normal' ? '정상' : hipStatus === 'warning' ? '경미한 불균형' : '심한 불균형'} 단계입니다
+                    </p>
+                    {/* 게이지바 (0-10° 범위, 0-3° 정상) + 마커 */}
+                    <div className="relative h-2 bg-slate-700/50 rounded-full">
+                      {/* 정상 범위 배경 (0-3°) */}
+                      <div className="absolute left-0 top-0 h-full rounded-l-full bg-teal-500/20" style={{ width: '30%' }} />
+                      {/* 주의 범위 배경 (3-5°) */}
+                      <div className="absolute left-[30%] top-0 h-full bg-amber-500/10" style={{ width: '20%' }} />
+                      {/* 현재 위치 마커 */}
+                      <div
+                        className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white shadow-md transition-all ${hipStatus === 'normal' ? 'bg-teal-400' : hipStatus === 'warning' ? 'bg-amber-400' : 'bg-rose-400'}`}
+                        style={{ left: `calc(${Math.min(100, Math.max(0, Math.abs(hipTiltAngle) / 10 * 100))}% - 6px)` }}
+                      />
+                      {/* 기준선 */}
+                      <div className="absolute top-0 left-[30%] w-px h-full bg-white/50" title="정상 기준 (3°)" />
+                      <div className="absolute top-0 left-[50%] w-px h-full bg-white/30" title="주의 기준 (5°)" />
+                    </div>
+                    <div className="flex justify-between mt-1 text-[9px] text-muted-foreground">
+                      <span>0°</span>
+                      <span className="text-teal-400/70">3°</span>
+                      <span>10°</span>
+                    </div>
                   </div>
-                  {/* 무릎 */}
-                  <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2.5 items-center hover:bg-slate-800/30 transition-colors">
-                    <span className="text-xs text-foreground">무릎 정렬</span>
-                    <span className={`text-sm font-bold text-center ${kneeStatus === 'normal' ? 'text-teal-400' : kneeStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>
-                      {Math.abs(kneeTiltAngle)}°
-                    </span>
-                    <span className="flex justify-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${kneeStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : kneeStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                </div>
+              </div>
+
+              {/* 무릎 정렬 카드 */}
+              <div className={`rounded-lg border p-3 ${kneeStatus === 'normal' ? 'border-teal-500/30 bg-teal-500/5' : kneeStatus === 'warning' ? 'border-amber-500/30 bg-amber-500/5' : 'border-rose-500/30 bg-rose-500/5'}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${kneeStatus === 'normal' ? 'bg-teal-500/20' : kneeStatus === 'warning' ? 'bg-amber-500/20' : 'bg-rose-500/20'}`}>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke={getStatusColor(kneeStatus)} strokeWidth="2">
+                      <circle cx="8" cy="12" r="3" />
+                      <circle cx="16" cy="12" r="3" />
+                      <line x1="11" y1="12" x2="13" y2="12" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-foreground">무릎 정렬</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${kneeStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : kneeStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
                         {kneeStatus === 'normal' ? '정상' : kneeStatus === 'warning' ? '주의' : '위험'}
                       </span>
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {Math.abs(kneeTiltAngle) <= 2 ? '무릎 정렬이 좋아요' : kneeTiltAngle > 0 ? '무릎이 좌측으로 틀어져 있어요' : '무릎이 우측으로 틀어져 있어요'}
-                    </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mb-2">
+                      무릎 좌우 정렬이 <span className={`font-bold ${kneeStatus === 'normal' ? 'text-teal-400' : kneeStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>{Math.abs(kneeTiltAngle)}°</span>로 {kneeStatus === 'normal' ? '정상' : kneeStatus === 'warning' ? '경미한 불균형' : '심한 불균형'} 단계입니다
+                    </p>
+                    {/* 게이지바 (0-10° 범위, 0-2° 정상) + 마커 */}
+                    <div className="relative h-2 bg-slate-700/50 rounded-full">
+                      {/* 정상 범위 배경 (0-2°) */}
+                      <div className="absolute left-0 top-0 h-full rounded-l-full bg-teal-500/20" style={{ width: '20%' }} />
+                      {/* 주의 범위 배경 (2-5°) */}
+                      <div className="absolute left-[20%] top-0 h-full bg-amber-500/10" style={{ width: '30%' }} />
+                      {/* 현재 위치 마커 */}
+                      <div
+                        className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white shadow-md transition-all ${kneeStatus === 'normal' ? 'bg-teal-400' : kneeStatus === 'warning' ? 'bg-amber-400' : 'bg-rose-400'}`}
+                        style={{ left: `calc(${Math.min(100, Math.max(0, Math.abs(kneeTiltAngle) / 10 * 100))}% - 6px)` }}
+                      />
+                      {/* 기준선 */}
+                      <div className="absolute top-0 left-[20%] w-px h-full bg-white/50" title="정상 기준 (2°)" />
+                      <div className="absolute top-0 left-[50%] w-px h-full bg-white/30" title="주의 기준 (5°)" />
+                    </div>
+                    <div className="flex justify-between mt-1 text-[9px] text-muted-foreground">
+                      <span>0°</span>
+                      <span className="text-teal-400/70">2°</span>
+                      <span>10°</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -748,7 +862,7 @@ function SkeletonAlignmentVisualization({ jointAngles, asymmetryResults }: Skele
         {/* 구분선 */}
         <div className="border-t border-border/50" />
 
-        {/* ==================== 측면 섹션 ==================== */}
+        {/* ==================== 측면 섹션 (에버엑스 스타일) ==================== */}
         <div>
           <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
@@ -756,7 +870,7 @@ function SkeletonAlignmentVisualization({ jointAngles, asymmetryResults }: Skele
           </p>
 
           <div className="flex gap-4">
-            {/* 측면 골격 이미지 */}
+            {/* 왼쪽: 측면 전신 이미지 + 마커/각도선 오버레이 */}
             <div
               className="relative rounded-xl overflow-hidden border border-border/50 flex-shrink-0 bg-gradient-to-b from-slate-800 to-slate-900"
               style={{ width: '180px', height: '400px' }}
@@ -774,94 +888,198 @@ function SkeletonAlignmentVisualization({ jointAngles, asymmetryResults }: Skele
                 />
               )}
 
-              {/* SVG 오버레이 */}
+              {/* SVG 오버레이 - 깔끔한 호(arc) 스타일 */}
               <svg viewBox={`0 0 ${vw} ${vh}`} className="absolute inset-0 w-full h-full" style={{ zIndex: 10 }}>
-                <defs>
-                  <pattern id="grid-side" width="10" height="10" patternUnits="userSpaceOnUse">
-                    <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#grid-side)" />
+                {/* 중앙 기준선 */}
+                <line x1={cxSide} y1="30" x2={cxSide} y2={vh - 25} stroke={colors.reference} strokeWidth="0.5" strokeDasharray="2 2" opacity="0.25" />
 
-                {/* 기준선 */}
-                <line x1={cxSide} y1="15" x2={cxSide} y2={vh - 10} stroke={colors.reference} strokeWidth="0.8" strokeDasharray="3 2" opacity="0.4" />
+                {/* ===== 거북목 (귀-목-어깨) ===== */}
+                {/* 수직 기준선 (점선) */}
+                <line x1={cxSide} y1={s.earY} x2={cxSide} y2={s.shoulderY} stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" strokeDasharray="2 1" />
+                {/* 실제 목 라인 */}
+                <line x1={cxSide + forwardHeadAngle * 0.25} y1={s.earY} x2={cxSide} y2={s.neckY} stroke={getStatusColor(neckStatus)} strokeWidth="0.8" />
+                <line x1={cxSide} y1={s.neckY} x2={cxSide} y2={s.shoulderY} stroke={getStatusColor(neckStatus)} strokeWidth="0.8" />
+                {/* 각도 호 */}
+                <path
+                  d={`M ${cxSide} ${s.neckY - 5} A 5 5 0 0 1 ${cxSide + Math.min(5, forwardHeadAngle * 0.12)} ${s.neckY - 4}`}
+                  fill="none"
+                  stroke={getStatusColor(neckStatus)}
+                  strokeWidth="0.6"
+                  opacity="0.8"
+                />
+                {/* 마커 (귀-목-어깨) */}
+                <circle cx={cxSide + forwardHeadAngle * 0.25} cy={s.earY} r="1.5" fill={getStatusColor(neckStatus)} />
+                <circle cx={cxSide} cy={s.neckY} r="1.5" fill={getStatusColor(neckStatus)} />
+                <circle cx={cxSide} cy={s.shoulderY} r="1.5" fill={getStatusColor(neckStatus)} />
 
-                {/* 거북목 */}
-                <circle cx={cxSide + headOffset} cy={s.earY} r="4.5" fill={getStatusColor(neckStatus)} />
-                <line x1={cxSide} y1={s.earY} x2={cxSide + headOffset} y2={s.earY} stroke={getStatusColor(neckStatus)} strokeWidth="2" />
-                <line x1={cxSide} y1={s.earY} x2={cxSide} y2={s.shoulderY} stroke="rgba(255,255,255,0.25)" strokeWidth="1" strokeDasharray="2 2" />
+                {/* ===== 허리 전만 (어깨-허리-골반) ===== */}
+                {/* 직선 기준 (점선) */}
+                <line x1={cxSide} y1={s.shoulderY} x2={cxSide} y2={s.hipY} stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" strokeDasharray="2 1" />
+                {/* 실제 척추 라인 */}
+                <line x1={cxSide} y1={s.shoulderY} x2={cxSide - 3} y2={s.lumbarY} stroke={getStatusColor(lumbarStatus)} strokeWidth="0.8" />
+                <line x1={cxSide - 3} y1={s.lumbarY} x2={cxSide} y2={s.hipY} stroke={getStatusColor(lumbarStatus)} strokeWidth="0.8" />
+                {/* 각도 호 */}
+                <path
+                  d={`M ${cxSide - 1} ${s.lumbarY - 5} A 5 5 0 0 0 ${cxSide - 1} ${s.lumbarY + 5}`}
+                  fill="none"
+                  stroke={getStatusColor(lumbarStatus)}
+                  strokeWidth="0.6"
+                  opacity="0.8"
+                />
+                {/* 마커 (어깨-허리-골반) */}
+                <circle cx={cxSide} cy={s.shoulderY} r="1.5" fill={getStatusColor(lumbarStatus)} />
+                <circle cx={cxSide - 3} cy={s.lumbarY} r="1.5" fill={getStatusColor(lumbarStatus)} />
+                <circle cx={cxSide} cy={s.hipY} r="1.5" fill={getStatusColor(lumbarStatus)} />
 
-                {/* 흉추 (등굽음) */}
-                <path d={`M ${cxSide} ${s.shoulderY} Q ${cxSide - 10} ${s.thoracicY} ${cxSide} ${s.lumbarY}`} fill="none" stroke={getStatusColor(thoracicStatus)} strokeWidth="2" />
-                <circle cx={cxSide - 8} cy={s.thoracicY} r="3.5" fill={getStatusColor(thoracicStatus)} />
+                {/* ===== 무릎 신전 (골반-무릎-발목) ===== */}
+                {/* 직선 기준 (점선) */}
+                <line x1={cxSide} y1={s.hipY} x2={cxSide} y2={s.ankleY} stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" strokeDasharray="2 1" />
+                {/* 실제 다리 라인 */}
+                <line x1={cxSide} y1={s.hipY} x2={cxSide + (kneeExtensionAngle > 180 ? 1.5 : 0)} y2={s.kneeY} stroke={getStatusColor(kneeExtensionStatus)} strokeWidth="0.8" />
+                <line x1={cxSide + (kneeExtensionAngle > 180 ? 1.5 : 0)} y1={s.kneeY} x2={cxSide} y2={s.ankleY} stroke={getStatusColor(kneeExtensionStatus)} strokeWidth="0.8" />
+                {/* 각도 호 */}
+                <path
+                  d={`M ${cxSide + 1} ${s.kneeY - 5} A 5 5 0 0 1 ${cxSide + 1} ${s.kneeY + 5}`}
+                  fill="none"
+                  stroke={getStatusColor(kneeExtensionStatus)}
+                  strokeWidth="0.6"
+                  opacity="0.8"
+                />
+                {/* 마커 (골반-무릎-발목) */}
+                <circle cx={cxSide} cy={s.hipY} r="1.5" fill={getStatusColor(kneeExtensionStatus)} />
+                <circle cx={cxSide + (kneeExtensionAngle > 180 ? 1.5 : 0)} cy={s.kneeY} r="1.5" fill={getStatusColor(kneeExtensionStatus)} />
+                <circle cx={cxSide} cy={s.ankleY} r="1.5" fill={getStatusColor(kneeExtensionStatus)} />
 
-                {/* 요추 (허리) */}
-                <path d={`M ${cxSide} ${s.lumbarY} Q ${cxSide + 8} ${(s.lumbarY + s.hipY) / 2} ${cxSide} ${s.hipY}`} fill="none" stroke={getStatusColor(lumbarStatus)} strokeWidth="2" />
-                <circle cx={cxSide + 6} cy={(s.lumbarY + s.hipY) / 2} r="3.5" fill={getStatusColor(lumbarStatus)} />
-
-                {/* 후/전 라벨 */}
-                <text x="6" y="12" fontSize="8" fill="rgba(255,255,255,0.5)" fontWeight="600">후</text>
-                <text x={vw - 14} y="12" fontSize="8" fill="rgba(255,255,255,0.5)" fontWeight="600">전</text>
+                {/* 라벨 */}
+                <text x="6" y="14" fontSize="6" fill="rgba(255,255,255,0.35)" fontWeight="500">후</text>
+                <text x={vw - 10} y="14" fontSize="6" fill="rgba(255,255,255,0.35)" fontWeight="500">전</text>
               </svg>
             </div>
 
-            {/* 측면 상세 분석 - 테이블 형식 */}
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-medium text-muted-foreground mb-2">몸 기울이기 · 앞뒤</p>
-              <div className="rounded-lg border border-slate-700/50 overflow-hidden">
-                {/* 테이블 헤더 */}
-                <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2 bg-slate-800/80 text-[10px] font-medium text-slate-400">
-                  <span>측정 항목</span>
-                  <span className="text-center">측정값</span>
-                  <span className="text-center">상태</span>
-                  <span>분석</span>
-                </div>
-                {/* 테이블 바디 */}
-                <div className="divide-y divide-slate-700/50">
-                  {/* 목 앞뒤 편차 */}
-                  <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2.5 items-center hover:bg-slate-800/30 transition-colors">
-                    <span className="text-xs text-foreground">목 앞뒤 편차</span>
-                    <span className={`text-sm font-bold text-center ${neckStatus === 'normal' ? 'text-teal-400' : neckStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>
-                      {neckForwardDistance}cm
-                    </span>
-                    <span className="flex justify-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${neckStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : neckStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+            {/* 오른쪽: 부위별 분석 카드 3개 (세로 배치) */}
+            <div className="flex-1 flex flex-col gap-2.5">
+              {/* 거북목 카드 */}
+              <div className={`rounded-lg border p-3 ${neckStatus === 'normal' ? 'border-teal-500/30 bg-teal-500/5' : neckStatus === 'warning' ? 'border-amber-500/30 bg-amber-500/5' : 'border-rose-500/30 bg-rose-500/5'}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${neckStatus === 'normal' ? 'bg-teal-500/20' : neckStatus === 'warning' ? 'bg-amber-500/20' : 'bg-rose-500/20'}`}>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke={getStatusColor(neckStatus)} strokeWidth="2">
+                      <circle cx="12" cy="5" r="3" />
+                      <path d="M12 8v4M12 12c-3 0-5 2-5 5v3h10v-3c0-3-2-5-5-5z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-foreground">거북목</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${neckStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : neckStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
                         {neckStatus === 'normal' ? '정상' : neckStatus === 'warning' ? '주의' : '위험'}
                       </span>
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {neckForwardDistance <= 2.5 ? '목 위치가 정상이에요' : '머리가 앞으로 나와있어요'}
-                    </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mb-2">
+                      목 전방 각도가 <span className={`font-bold ${neckStatus === 'normal' ? 'text-teal-400' : neckStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>{forwardHeadAngle}°</span>로 {neckStatus === 'normal' ? '정상' : neckStatus === 'warning' ? '경미한 거북목' : '심한 거북목'} 단계입니다
+                    </p>
+                    {/* 각도 게이지바 (0-45° 범위, 0-15° 정상) + 마커 */}
+                    <div className="relative h-2 bg-slate-700/50 rounded-full">
+                      {/* 정상 범위 배경 (0-15°) */}
+                      <div className="absolute left-0 top-0 h-full rounded-l-full bg-teal-500/20" style={{ width: '33%' }} />
+                      {/* 주의 범위 배경 (15-30°) */}
+                      <div className="absolute left-[33%] top-0 h-full bg-amber-500/10" style={{ width: '34%' }} />
+                      {/* 현재 위치 마커 */}
+                      <div
+                        className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white shadow-md transition-all ${neckStatus === 'normal' ? 'bg-teal-400' : neckStatus === 'warning' ? 'bg-amber-400' : 'bg-rose-400'}`}
+                        style={{ left: `calc(${Math.min(100, Math.max(0, forwardHeadAngle / 45 * 100))}% - 6px)` }}
+                      />
+                      {/* 기준선 */}
+                      <div className="absolute top-0 left-[33%] w-px h-full bg-white/50" title="정상 기준 (15°)" />
+                      <div className="absolute top-0 left-[67%] w-px h-full bg-white/30" title="주의 기준 (30°)" />
+                    </div>
+                    <div className="flex justify-between mt-1 text-[9px] text-muted-foreground">
+                      <span>0°</span>
+                      <span className="text-teal-400/70">15°</span>
+                      <span>45°</span>
+                    </div>
                   </div>
-                  {/* 흉추 후만각 */}
-                  <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2.5 items-center hover:bg-slate-800/30 transition-colors">
-                    <span className="text-xs text-foreground">흉추 후만각</span>
-                    <span className={`text-sm font-bold text-center ${thoracicStatus === 'normal' ? 'text-teal-400' : thoracicStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>
-                      {thoracicKyphosis}°
-                    </span>
-                    <span className="flex justify-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${thoracicStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : thoracicStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
-                        {thoracicStatus === 'normal' ? '정상' : thoracicStatus === 'warning' ? '주의' : '위험'}
-                      </span>
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {thoracicKyphosis <= 40 ? '등 곡선이 정상이에요' : '등이 굽어있어요'}
-                    </span>
+                </div>
+              </div>
+
+              {/* 허리 전만 카드 */}
+              <div className={`rounded-lg border p-3 ${lumbarStatus === 'normal' ? 'border-teal-500/30 bg-teal-500/5' : lumbarStatus === 'warning' ? 'border-amber-500/30 bg-amber-500/5' : 'border-rose-500/30 bg-rose-500/5'}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${lumbarStatus === 'normal' ? 'bg-teal-500/20' : lumbarStatus === 'warning' ? 'bg-amber-500/20' : 'bg-rose-500/20'}`}>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke={getStatusColor(lumbarStatus)} strokeWidth="2">
+                      <path d="M12 2v6M12 22v-6M12 8c-2 0-4 2-4 6s2 6 4 6 4-2 4-6-2-6-4-6z" />
+                    </svg>
                   </div>
-                  {/* 요추 전만각 */}
-                  <div className="grid grid-cols-[1fr_80px_56px_1fr] gap-1 px-3 py-2.5 items-center hover:bg-slate-800/30 transition-colors">
-                    <span className="text-xs text-foreground">요추 전만각</span>
-                    <span className={`text-sm font-bold text-center ${lumbarStatus === 'normal' ? 'text-teal-400' : lumbarStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>
-                      {lumbarLordosis}°
-                    </span>
-                    <span className="flex justify-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${lumbarStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : lumbarStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-foreground">허리 전만</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${lumbarStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : lumbarStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
                         {lumbarStatus === 'normal' ? '정상' : lumbarStatus === 'warning' ? '주의' : '위험'}
                       </span>
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {lumbarLordosis >= 30 && lumbarLordosis <= 45 ? '허리 곡선이 정상이에요' : '허리 곡선에 주의가 필요해요'}
-                    </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mb-2">
+                      요추 전만각이 <span className={`font-bold ${lumbarStatus === 'normal' ? 'text-teal-400' : lumbarStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>{lumbarLordosis}°</span>로 {lumbarStatus === 'normal' ? '정상 범위' : lumbarLordosis > 45 ? '과전만 상태' : '평탄화 상태'}입니다
+                    </p>
+                    {/* 각도 게이지바 (0-60° 범위, 30-45° 정상) + 마커 */}
+                    <div className="relative h-2 bg-slate-700/50 rounded-full">
+                      {/* 정상 범위 배경 (30-45°) */}
+                      <div className="absolute left-[50%] top-0 h-full bg-teal-500/20" style={{ width: '25%' }} />
+                      {/* 현재 위치 마커 */}
+                      <div
+                        className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white shadow-md transition-all ${lumbarStatus === 'normal' ? 'bg-teal-400' : lumbarStatus === 'warning' ? 'bg-amber-400' : 'bg-rose-400'}`}
+                        style={{ left: `calc(${Math.min(100, Math.max(0, lumbarLordosis / 60 * 100))}% - 6px)` }}
+                      />
+                      {/* 기준선 */}
+                      <div className="absolute top-0 left-[50%] w-px h-full bg-white/50" title="정상 시작 (30°)" />
+                      <div className="absolute top-0 left-[75%] w-px h-full bg-white/50" title="정상 끝 (45°)" />
+                    </div>
+                    <div className="flex justify-between mt-1 text-[9px] text-muted-foreground">
+                      <span>0°</span>
+                      <span className="text-teal-400/70">30-45°</span>
+                      <span>60°</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 무릎 과신전 카드 */}
+              <div className={`rounded-lg border p-3 ${kneeExtensionStatus === 'normal' ? 'border-teal-500/30 bg-teal-500/5' : kneeExtensionStatus === 'warning' ? 'border-amber-500/30 bg-amber-500/5' : 'border-rose-500/30 bg-rose-500/5'}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${kneeExtensionStatus === 'normal' ? 'bg-teal-500/20' : kneeExtensionStatus === 'warning' ? 'bg-amber-500/20' : 'bg-rose-500/20'}`}>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke={getStatusColor(kneeExtensionStatus)} strokeWidth="2">
+                      <path d="M12 2v8M12 22v-8M8 10h8M8 14h8" />
+                      <circle cx="12" cy="12" r="2" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-foreground">무릎 과신전</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${kneeExtensionStatus === 'normal' ? 'bg-teal-500/20 text-teal-400' : kneeExtensionStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                        {kneeExtensionStatus === 'normal' ? '정상' : kneeExtensionStatus === 'warning' ? '주의' : '위험'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mb-2">
+                      무릎 신전 각도가 <span className={`font-bold ${kneeExtensionStatus === 'normal' ? 'text-teal-400' : kneeExtensionStatus === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>{kneeExtensionAngle}°</span>로 {kneeExtensionStatus === 'normal' ? '정상 범위' : '과신전 상태'}입니다
+                    </p>
+                    {/* 각도 게이지바 (170-190° 범위, 175-180° 정상) + 마커 */}
+                    <div className="relative h-2 bg-slate-700/50 rounded-full">
+                      {/* 정상 범위 배경 (175-180°) */}
+                      <div className="absolute left-[25%] top-0 h-full bg-teal-500/20" style={{ width: '25%' }} />
+                      {/* 과신전 범위 배경 (180°+) */}
+                      <div className="absolute left-[50%] top-0 h-full rounded-r-full bg-rose-500/10" style={{ width: '50%' }} />
+                      {/* 현재 위치 마커 */}
+                      <div
+                        className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white shadow-md transition-all ${kneeExtensionStatus === 'normal' ? 'bg-teal-400' : kneeExtensionStatus === 'warning' ? 'bg-amber-400' : 'bg-rose-400'}`}
+                        style={{ left: `calc(${Math.min(100, Math.max(0, (kneeExtensionAngle - 170) / 20 * 100))}% - 6px)` }}
+                      />
+                      {/* 기준선 */}
+                      <div className="absolute top-0 left-[25%] w-px h-full bg-white/50" title="정상 시작 (175°)" />
+                      <div className="absolute top-0 left-[50%] w-px h-full bg-white/50" title="과신전 기준 (180°)" />
+                    </div>
+                    <div className="flex justify-between mt-1 text-[9px] text-muted-foreground">
+                      <span>170°</span>
+                      <span className="text-teal-400/70">175-180°</span>
+                      <span>190°</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1283,43 +1501,92 @@ function AnalysisItemCard({
 interface PostureTypeDiagnosisProps {
   score: number;
   results: ExtendedAnalysisItem[];
+  measurements?: {
+    neckForwardDistance: number;
+    shoulderTiltAngle: number;
+    hipTiltAngle: number;
+    kneeTiltAngle: number;
+  };
 }
 
-function PostureTypeDiagnosisCard({ score, results }: PostureTypeDiagnosisProps) {
+function PostureTypeDiagnosisCard({ score, results, measurements }: PostureTypeDiagnosisProps) {
   // 자세 유형 판단
   const getPostureType = () => {
     const forwardHead = results.find(r => r.id === 'forward_head');
     const shoulderTilt = results.find(r => r.id === 'shoulder_tilt');
+    const pelvisTilt = results.find(r => r.id === 'pelvis_tilt');
+    const kneeAngle = results.find(r => r.id === 'knee_angle');
+
+    // 측정값 기반 grade 계산 함수
+    const getGradeFromMeasurement = (value: number, normalMax: number, warningMax: number): 'good' | 'warning' | 'danger' => {
+      if (Math.abs(value) <= normalMax) return 'good';
+      if (Math.abs(value) <= warningMax) return 'warning';
+      return 'danger';
+    };
+
+    // 실시간 측정값 기반 grade (measurements가 있으면 사용, 없으면 results 사용)
+    const forwardHeadGrade = measurements
+      ? getGradeFromMeasurement(measurements.neckForwardDistance, 2.5, 5)
+      : forwardHead?.grade || 'good';
+
+    const shoulderGrade = measurements
+      ? getGradeFromMeasurement(measurements.shoulderTiltAngle, 2, 5)
+      : shoulderTilt?.grade || 'good';
+
+    const pelvisGrade = measurements
+      ? getGradeFromMeasurement(measurements.hipTiltAngle, 2, 5)
+      : pelvisTilt?.grade || 'good';
+
+    const kneeGrade = measurements
+      ? getGradeFromMeasurement(measurements.kneeTiltAngle, 2, 5)
+      : kneeAngle?.grade || 'good';
+
+    // features 배열 동적 생성
+    const getFeatureText = (label: string, grade?: string) => {
+      const status = grade === 'danger' ? '위험' : grade === 'warning' ? '주의' : '정상';
+      return `${label} ${status}`;
+    };
+
+    const features = [
+      getFeatureText('거북목', forwardHeadGrade),
+      getFeatureText('어깨 균형', shoulderGrade),
+      getFeatureText('골반 균형', pelvisGrade),
+      getFeatureText('무릎 정렬', kneeGrade),
+    ];
 
     // danger 상태 우선 체크
-    if (forwardHead?.grade === 'danger') {
+    if (forwardHeadGrade === 'danger') {
       return {
         name: '거북목 위험',
         description: '머리가 어깨보다 상당히 앞으로 나와 목과 어깨에 큰 부담이 가는 자세입니다.',
         severity: 'danger' as const,
+        features,
       };
     }
-    if (shoulderTilt?.grade === 'danger') {
+    if (shoulderGrade === 'danger') {
       return {
-        name: '라운드숄더 위험',
-        description: '어깨가 심하게 말려 있어 등과 목에 부담이 가는 자세입니다.',
+        name: '어깨 불균형 위험',
+        description: '어깨가 심하게 틀어져 있어 등과 목에 부담이 가는 자세입니다.',
         severity: 'danger' as const,
+        features,
       };
     }
 
     // warning 상태 체크
-    if (forwardHead?.grade === 'warning') {
+    if (forwardHeadGrade === 'warning') {
       return {
         name: '경미한 거북목',
         description: '머리가 어깨보다 앞으로 나와 목에 부담이 가는 자세입니다.',
         severity: 'warning' as const,
+        features,
       };
     }
-    if (shoulderTilt?.grade === 'warning') {
+    if (shoulderGrade === 'warning') {
       return {
-        name: '라운드숄더 주의',
-        description: '어깨가 약간 앞으로 말려 있어 주의가 필요합니다.',
+        name: '어깨 불균형 주의',
+        description: '어깨가 약간 틀어져 있어 주의가 필요합니다.',
         severity: 'warning' as const,
+        features,
       };
     }
 
@@ -1328,6 +1595,7 @@ function PostureTypeDiagnosisCard({ score, results }: PostureTypeDiagnosisProps)
       name: '정상 자세',
       description: '전반적으로 균형 잡힌 좋은 자세를 유지하고 있습니다.',
       severity: 'normal' as const,
+      features,
     };
   };
 
@@ -1679,6 +1947,35 @@ export default function ResultPage() {
     return analyzeAllAsymmetry(jointAngles);
   }, [jointAngles]);
 
+  /**
+   * 자세 유형 진단을 위한 측정값 계산
+   */
+  const postureMeasurements = useMemo(() => {
+    const side = storedLandmarks?.side;
+
+    // FHP 거리 (cm) - 랜드마크 기반 우선
+    const neckForwardDistance = side
+      ? Number((Math.abs((side[7]?.x ?? 0.5) - (side[11]?.x ?? 0.5)) * 40).toFixed(1))
+      : jointAngles ? Number((jointAngles.neck * 0.3).toFixed(1)) : 2.0;
+
+    // 어깨 기울기 (°)
+    const shoulderTiltAngle = jointAngles
+      ? Number(((jointAngles.shoulderLeft - jointAngles.shoulderRight) / 2).toFixed(1))
+      : 0;
+
+    // 골반 기울기 (°)
+    const hipTiltAngle = jointAngles
+      ? Number(((jointAngles.hipLeft - jointAngles.hipRight) / 5).toFixed(1))
+      : 0;
+
+    // 무릎 기울기 (°)
+    const kneeTiltAngle = jointAngles
+      ? Number(((jointAngles.kneeLeft - jointAngles.kneeRight) / 3).toFixed(1))
+      : 0;
+
+    return { neckForwardDistance, shoulderTiltAngle, hipTiltAngle, kneeTiltAngle };
+  }, [jointAngles, storedLandmarks]);
+
   // ROM 분석 및 점수/요약은 통합 섹션으로 이동하여 미사용
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _romResults = useMemo((): ROMResult[] => {
@@ -1822,17 +2119,18 @@ export default function ResultPage() {
   const summaryScore = overallScore;
 
   const getSummaryMessage = (score: number): string => {
-    if (score >= 90) return '아주 좋은 자세예요!';
-    if (score >= 70) return '전반적으로 양호해요';
-    if (score >= 50) return '조금 신경 쓰면 좋겠어요';
+    if (score >= 90) return '매우 좋은 자세예요!';
+    if (score >= 75) return '양호한 자세예요';
+    if (score >= 65) return '평균적인 자세예요';
+    if (score >= 55) return '개선이 필요해요';
+    if (score >= 45) return '주의가 필요해요';
     return '교정이 필요해요';
   };
 
   const getSummaryScoreColor = (score: number): string => {
-    if (score >= 90) return 'text-green-500';
-    if (score >= 70) return 'text-blue-500';
-    if (score >= 50) return 'text-yellow-500';
-    return 'text-red-500';
+    if (score >= 75) return 'text-teal-500';
+    if (score >= 60) return 'text-amber-500';
+    return 'text-rose-500';
   };
 
   return (
@@ -1878,7 +2176,11 @@ export default function ResultPage() {
           {/* 자세 유형 진단 카드 (원형 점수 + 유형 정보) */}
           {/* ============================================================ */}
           <motion.section variants={itemVariants}>
-            <PostureTypeDiagnosisCard score={summaryScore} results={results} />
+            <PostureTypeDiagnosisCard
+              score={summaryScore}
+              results={results}
+              measurements={postureMeasurements}
+            />
           </motion.section>
 
           {/* ============================================================ */}
@@ -1890,6 +2192,7 @@ export default function ResultPage() {
                 jointAngles={jointAngles}
                 asymmetryResults={asymmetryResults}
                 capturedImage={capturedImages?.front}
+                sideLandmarks={storedLandmarks?.side ?? undefined}
               />
             </motion.section>
           )}

@@ -186,7 +186,7 @@ export default function DynamicSkeleton({
               x2={p2.x}
               y2={p2.y}
               stroke="#22c55e"        // 초록색 (emerald-500)
-              strokeWidth="2"          // 선 두께
+              strokeWidth="1"          // 선 두께
               strokeLinecap="round"    // 선 끝 모양
             />
           );
@@ -210,10 +210,10 @@ export default function DynamicSkeleton({
               key={`point-${idx}`}
               cx={p.x}
               cy={p.y}
-              r="4"                    // 원 반지름 (4px)
+              r="2"                    // 원 반지름 (2px)
               fill="#22c55e"           // 초록색 채우기
               stroke="#15803d"         // 진한 초록색 테두리
-              strokeWidth="1"          // 테두리 두께
+              strokeWidth="0.5"        // 테두리 두께
             />
           );
         })}

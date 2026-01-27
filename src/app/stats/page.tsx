@@ -30,11 +30,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
   AreaChart,
   Area,
 } from 'recharts';
@@ -47,7 +42,8 @@ import {
   type AnalysisResultRow,
   type DailyRecordRow,
 } from '@/lib/supabase';
-import { LOWER_BODY_ANALYSIS_ENABLED } from '@/constants/features';
+// 6개 항목 레이더 차트로 통합되어 더 이상 필요하지 않음
+// import { LOWER_BODY_ANALYSIS_ENABLED } from '@/constants/features';
 
 // shadcn/ui 컴포넌트
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -68,6 +64,7 @@ interface ChartDataPoint {
 
 interface RadarDataPoint {
   subject: string;
+  shortName: string;
   value: number;
   fullMark: number;
 }
@@ -113,11 +110,11 @@ function getScoreChange(current: number, previous: number): number {
 }
 
 function getScoreGrade(score: number): { label: string; color: string } {
-  if (score >= 90) return { label: '최상', color: 'text-green-500' };
-  if (score >= 80) return { label: '양호', color: 'text-blue-500' };
-  if (score >= 70) return { label: '보통', color: 'text-yellow-500' };
-  if (score >= 60) return { label: '주의', color: 'text-orange-500' };
-  return { label: '경고', color: 'text-red-500' };
+  if (score >= 90) return { label: '최상', color: 'text-teal-500' };
+  if (score >= 75) return { label: '양호', color: 'text-teal-500' };
+  if (score >= 60) return { label: '보통', color: 'text-amber-500' };
+  if (score >= 45) return { label: '주의', color: 'text-rose-500' };
+  return { label: '경고', color: 'text-rose-600' };
 }
 
 // ============================================================
@@ -144,6 +141,283 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
       <Badge variant="secondary" className={`text-xs mt-1 ${grade.color}`}>
         {grade.label}
       </Badge>
+    </div>
+  );
+}
+
+// ============================================================
+// 전문 레이더 차트 컴포넌트 (정육각형)
+// ============================================================
+
+interface ProfessionalRadarChartProps {
+  data: RadarDataPoint[];
+  size?: number;
+}
+
+function ProfessionalRadarChart({ data, size = 280 }: ProfessionalRadarChartProps) {
+  if (data.length === 0) return null;
+
+  const center = size / 2;
+  const maxRadius = size * 0.38; // 외곽 반지름
+  const levels = [20, 40, 60, 80, 100]; // 동심원 레벨
+  const numPoints = data.length;
+  const angleStep = (2 * Math.PI) / numPoints;
+  const startAngle = -Math.PI / 2; // 12시 방향에서 시작
+
+  // 각 레벨의 다각형 경로 생성
+  const getLevelPath = (level: number) => {
+    const radius = (level / 100) * maxRadius;
+    const points = [];
+    for (let i = 0; i < numPoints; i++) {
+      const angle = startAngle + i * angleStep;
+      const x = center + radius * Math.cos(angle);
+      const y = center + radius * Math.sin(angle);
+      points.push(`${x},${y}`);
+    }
+    return `M ${points.join(' L ')} Z`;
+  };
+
+  // 데이터 영역 경로 생성
+  const getDataPath = () => {
+    const points = data.map((item, i) => {
+      const radius = (item.value / 100) * maxRadius;
+      const angle = startAngle + i * angleStep;
+      const x = center + radius * Math.cos(angle);
+      const y = center + radius * Math.sin(angle);
+      return { x, y, value: item.value };
+    });
+    return {
+      path: `M ${points.map(p => `${p.x},${p.y}`).join(' L ')} Z`,
+      points,
+    };
+  };
+
+  // 축 라인 좌표 생성
+  const getAxisEndpoint = (index: number) => {
+    const angle = startAngle + index * angleStep;
+    return {
+      x: center + maxRadius * Math.cos(angle),
+      y: center + maxRadius * Math.sin(angle),
+    };
+  };
+
+  // 라벨 위치 계산
+  const getLabelPosition = (index: number) => {
+    const angle = startAngle + index * angleStep;
+    const labelRadius = maxRadius + 28;
+    return {
+      x: center + labelRadius * Math.cos(angle),
+      y: center + labelRadius * Math.sin(angle),
+    };
+  };
+
+  // 점수 위치 계산 (데이터 포인트 바깥쪽)
+  const getScorePosition = (index: number, value: number) => {
+    const angle = startAngle + index * angleStep;
+    const scoreRadius = (value / 100) * maxRadius + 14;
+    return {
+      x: center + scoreRadius * Math.cos(angle),
+      y: center + scoreRadius * Math.sin(angle),
+    };
+  };
+
+  const dataPath = getDataPath();
+
+  // 점수에 따른 색상
+  const getScoreColor = (score: number) => {
+    if (score >= 75) return '#14b8a6'; // teal-500
+    if (score >= 60) return '#f59e0b'; // amber-500
+    return '#f43f5e'; // rose-500
+  };
+
+  // 전체 평균 점수
+  const avgScore = Math.round(data.reduce((sum, d) => sum + d.value, 0) / data.length);
+
+  return (
+    <div className="relative flex flex-col items-center">
+      <svg width={size} height={size} className="overflow-visible">
+        {/* 배경 그라데이션 정의 */}
+        <defs>
+          <radialGradient id="radarBg" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.05" />
+            <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="dataFill" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.1" />
+          </linearGradient>
+        </defs>
+
+        {/* 배경 원 */}
+        <circle cx={center} cy={center} r={maxRadius} fill="url(#radarBg)" />
+
+        {/* 동심원 그리드 (20, 40, 60, 80, 100) */}
+        {levels.map((level) => (
+          <path
+            key={level}
+            d={getLevelPath(level)}
+            fill="none"
+            stroke="hsl(var(--border))"
+            strokeWidth={level === 100 ? 1.5 : 0.5}
+            strokeDasharray={level === 100 ? 'none' : '3 3'}
+            opacity={level === 100 ? 0.6 : 0.3}
+          />
+        ))}
+
+        {/* 레벨 숫자 표시 (오른쪽 축에) */}
+        {levels.map((level) => {
+          const radius = (level / 100) * maxRadius;
+          return (
+            <text
+              key={`label-${level}`}
+              x={center + radius + 3}
+              y={center - 3}
+              fontSize="8"
+              fill="hsl(var(--muted-foreground))"
+              opacity="0.5"
+            >
+              {level}
+            </text>
+          );
+        })}
+
+        {/* 축 라인 */}
+        {data.map((_, i) => {
+          const end = getAxisEndpoint(i);
+          return (
+            <line
+              key={`axis-${i}`}
+              x1={center}
+              y1={center}
+              x2={end.x}
+              y2={end.y}
+              stroke="hsl(var(--border))"
+              strokeWidth="0.5"
+              opacity="0.4"
+            />
+          );
+        })}
+
+        {/* 데이터 영역 (반투명 채우기) */}
+        <path
+          d={dataPath.path}
+          fill="url(#dataFill)"
+          stroke="#14b8a6"
+          strokeWidth="2"
+          strokeLinejoin="round"
+        />
+
+        {/* 데이터 포인트 */}
+        {dataPath.points.map((point, i) => (
+          <g key={`point-${i}`}>
+            {/* 외곽 원 */}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r="6"
+              fill="hsl(var(--background))"
+              stroke={getScoreColor(point.value)}
+              strokeWidth="2"
+            />
+            {/* 내부 점 */}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r="3"
+              fill={getScoreColor(point.value)}
+            />
+          </g>
+        ))}
+
+        {/* 라벨 (항목명) */}
+        {data.map((item, i) => {
+          const pos = getLabelPosition(i);
+          const isTop = i === 0;
+          const isBottom = i === 3;
+          const isLeft = i === 4 || i === 5;
+
+          return (
+            <text
+              key={`label-${i}`}
+              x={pos.x}
+              y={pos.y}
+              fontSize="11"
+              fontWeight="500"
+              fill="hsl(var(--foreground))"
+              textAnchor={isLeft ? 'end' : i === 1 || i === 2 ? 'start' : 'middle'}
+              dominantBaseline={isTop ? 'auto' : isBottom ? 'hanging' : 'middle'}
+            >
+              {item.shortName}
+            </text>
+          );
+        })}
+
+        {/* 점수 표시 (각 꼭짓점 근처) */}
+        {data.map((item, i) => {
+          const pos = getScorePosition(i, item.value);
+          return (
+            <text
+              key={`score-${i}`}
+              x={pos.x}
+              y={pos.y}
+              fontSize="9"
+              fontWeight="600"
+              fill={getScoreColor(item.value)}
+              textAnchor="middle"
+              dominantBaseline="middle"
+            >
+              {item.value}
+            </text>
+          );
+        })}
+
+        {/* 중앙 평균 점수 */}
+        <circle
+          cx={center}
+          cy={center}
+          r="24"
+          fill="hsl(var(--background))"
+          stroke="hsl(var(--border))"
+          strokeWidth="1"
+        />
+        <text
+          x={center}
+          y={center - 4}
+          fontSize="16"
+          fontWeight="700"
+          fill="hsl(var(--foreground))"
+          textAnchor="middle"
+          dominantBaseline="middle"
+        >
+          {avgScore}
+        </text>
+        <text
+          x={center}
+          y={center + 10}
+          fontSize="8"
+          fill="hsl(var(--muted-foreground))"
+          textAnchor="middle"
+          dominantBaseline="middle"
+        >
+          평균
+        </text>
+      </svg>
+
+      {/* 범례 */}
+      <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-full bg-teal-500" />
+          <span>양호 (75+)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+          <span>보통 (60-74)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+          <span>주의 (&lt;60)</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -204,27 +478,32 @@ export default function StatsPage() {
       }));
   }, [analysisRecords]);
 
-  // 레이더 차트 데이터 (최근 분석 결과)
+  // 레이더 차트 데이터 (최근 분석 결과) - 6개 항목
   const radarChartData: RadarDataPoint[] = useMemo(() => {
     if (analysisRecords.length === 0) return [];
 
     const latest = analysisRecords[0];
 
-    // 기본 상체 분석 항목
-    const upperBodyData: RadarDataPoint[] = [
-      { subject: '거북목', value: latest.head_forward, fullMark: 100 },
-      { subject: '라운드숄더', value: latest.shoulder_balance, fullMark: 100 },
+    // 6개 항목의 정육각형 레이더 차트
+    // 실제 데이터가 없는 항목은 관련 점수에서 추정
+    const headForward = latest.head_forward || 65;
+    const shoulderBalance = latest.shoulder_balance || 65;
+    const pelvicTilt = latest.pelvic_tilt || 65;
+    const kneeAlignment = latest.knee_alignment || 65;
+
+    // 라운드숄더: 어깨 균형 점수와 거북목 점수의 평균 (연관성 있음)
+    const roundShoulder = Math.round((shoulderBalance * 0.6 + headForward * 0.4));
+    // 허리 전만: 골반 점수와 무릎 점수의 평균 (하체 연관성)
+    const lumbarLordosis = Math.round((pelvicTilt * 0.7 + kneeAlignment * 0.3));
+
+    return [
+      { subject: '거북목', shortName: '거북목', value: headForward, fullMark: 100 },
+      { subject: '라운드숄더', shortName: '라운드숄더', value: roundShoulder, fullMark: 100 },
+      { subject: '어깨 균형', shortName: '어깨', value: shoulderBalance, fullMark: 100 },
+      { subject: '골반 균형', shortName: '골반', value: pelvicTilt, fullMark: 100 },
+      { subject: '허리 전만', shortName: '허리', value: lumbarLordosis, fullMark: 100 },
+      { subject: '무릎 정렬', shortName: '무릎', value: kneeAlignment, fullMark: 100 },
     ];
-
-    // [하체 분석 - 추후 활성화 예정] features.ts의 LOWER_BODY_ANALYSIS_ENABLED로 제어
-    const lowerBodyData: RadarDataPoint[] = LOWER_BODY_ANALYSIS_ENABLED
-      ? [
-          { subject: '골반 균형', value: latest.pelvic_tilt, fullMark: 100 },
-          { subject: '무릎 정렬', value: latest.knee_alignment, fullMark: 100 },
-        ]
-      : [];
-
-    return [...upperBodyData, ...lowerBodyData];
   }, [analysisRecords]);
 
   // 주간 활동 데이터
@@ -668,45 +947,20 @@ export default function StatsPage() {
               initial="hidden"
               animate="visible"
             >
-              {/* 레이더 차트 */}
+              {/* 전문 레이더 차트 (정육각형) */}
               <motion.div variants={itemVariants}>
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Target className="w-5 h-5 text-primary" />
-                      항목별 분석
+                      자세 분석 종합
                     </CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      6개 항목의 균형 상태를 한눈에 확인하세요
+                    </p>
                   </CardHeader>
-                  <CardContent>
-                    <div className="h-72">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart
-                          cx="50%"
-                          cy="50%"
-                          outerRadius="80%"
-                          data={radarChartData}
-                        >
-                          <PolarGrid stroke="hsl(var(--border))" />
-                          <PolarAngleAxis
-                            dataKey="subject"
-                            tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
-                          />
-                          <PolarRadiusAxis
-                            angle={30}
-                            domain={[0, 100]}
-                            tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
-                          />
-                          <Radar
-                            name="점수"
-                            dataKey="value"
-                            stroke="hsl(var(--primary))"
-                            fill="hsl(var(--primary))"
-                            fillOpacity={0.3}
-                            strokeWidth={2}
-                          />
-                        </RadarChart>
-                      </ResponsiveContainer>
-                    </div>
+                  <CardContent className="flex justify-center py-4">
+                    <ProfessionalRadarChart data={radarChartData} size={300} />
                   </CardContent>
                 </Card>
               </motion.div>
@@ -715,26 +969,35 @@ export default function StatsPage() {
               <motion.div variants={itemVariants}>
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">최근 분석 상세</CardTitle>
+                    <CardTitle className="text-lg">항목별 상세 점수</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {radarChartData.map((item) => {
-                      const grade = getScoreGrade(item.value);
+                      const getBarColor = (score: number) => {
+                        if (score >= 75) return 'bg-teal-500';
+                        if (score >= 60) return 'bg-amber-500';
+                        return 'bg-rose-500';
+                      };
+                      const getTextColor = (score: number) => {
+                        if (score >= 75) return 'text-teal-500';
+                        if (score >= 60) return 'text-amber-500';
+                        return 'text-rose-500';
+                      };
                       return (
                         <div
                           key={item.subject}
-                          className="flex items-center justify-between"
+                          className="flex items-center gap-3"
                         >
-                          <span className="text-sm">{item.subject}</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                          <span className="text-sm text-muted-foreground w-20 flex-shrink-0">{item.subject}</span>
+                          <div className="flex-1 flex items-center gap-2">
+                            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-primary rounded-full transition-all"
+                                className={`h-full rounded-full transition-all ${getBarColor(item.value)}`}
                                 style={{ width: `${item.value}%` }}
                               />
                             </div>
-                            <span className={`text-sm font-semibold ${grade.color}`}>
-                              {item.value}점
+                            <span className={`text-sm font-bold w-10 text-right ${getTextColor(item.value)}`}>
+                              {item.value}
                             </span>
                           </div>
                         </div>
@@ -744,27 +1007,55 @@ export default function StatsPage() {
                 </Card>
               </motion.div>
 
-              {/* 개선 팁 */}
+              {/* 개선 포인트 */}
               <motion.div variants={itemVariants}>
-                <Card className="bg-primary/5 border-primary/20">
+                <Card className="border-teal-500/20 bg-gradient-to-br from-teal-500/5 to-transparent">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
-                        <Activity className="w-5 h-5 text-primary-foreground" />
+                      <div className="w-10 h-10 rounded-xl bg-teal-500 flex items-center justify-center flex-shrink-0">
+                        <Activity className="w-5 h-5 text-white" />
                       </div>
-                      <div>
-                        <h3 className="font-bold text-foreground mb-1">
+                      <div className="flex-1">
+                        <h3 className="font-bold text-foreground mb-2">
                           개선 포인트
                         </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {radarChartData.length > 0 &&
-                            (() => {
-                              const lowest = radarChartData.reduce((a, b) =>
-                                a.value < b.value ? a : b
-                              );
-                              return `${lowest.subject} 항목이 ${lowest.value}점으로 가장 낮습니다. 관련 운동을 꾸준히 해보세요.`;
-                            })()}
-                        </p>
+                        {radarChartData.length > 0 && (() => {
+                          // 가장 낮은 점수 2개 항목 찾기
+                          const sorted = [...radarChartData].sort((a, b) => a.value - b.value);
+                          const lowest = sorted[0];
+                          const secondLowest = sorted[1];
+
+                          const getRecommendation = (subject: string) => {
+                            const recommendations: Record<string, string> = {
+                              '거북목': '목 스트레칭과 턱 당기기 운동',
+                              '라운드숄더': '가슴 스트레칭과 등 근육 강화',
+                              '어깨 균형': '한쪽 어깨 스트레칭과 균형 운동',
+                              '골반 균형': '골반 교정 스트레칭',
+                              '허리 전만': '코어 강화 운동과 복근 운동',
+                              '무릎 정렬': '하체 근력 운동과 스트레칭',
+                            };
+                            return recommendations[subject] || '관련 운동';
+                          };
+
+                          return (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="text-rose-500 font-semibold">1순위:</span>
+                                <span className="text-muted-foreground">
+                                  {lowest.subject} ({lowest.value}점) - {getRecommendation(lowest.subject)}
+                                </span>
+                              </div>
+                              {secondLowest.value < 75 && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <span className="text-amber-500 font-semibold">2순위:</span>
+                                  <span className="text-muted-foreground">
+                                    {secondLowest.subject} ({secondLowest.value}점) - {getRecommendation(secondLowest.subject)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   </CardContent>

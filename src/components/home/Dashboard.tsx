@@ -9,8 +9,9 @@
 
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera,
@@ -216,6 +217,7 @@ function ScoreCircle({ value, size = 120, strokeWidth = 10 }: ScoreCircleProps) 
 // ============================================================
 
 export default function Dashboard() {
+  const router = useRouter();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { user, signOut } = useAuth();
   const storeAnalysisResult = useAnalysisResult();
@@ -228,6 +230,19 @@ export default function Dashboard() {
   const [latestAnalysis, setLatestAnalysis] = useState<{
     overallScore: number;
     items: Array<{ id: string; name: string; grade: string; score: number }>;
+  } | null>(null);
+  // Supabase에서 가져온 전체 레코드 (클릭 시 localStorage에 저장용)
+  const [latestAnalysisRecord, setLatestAnalysisRecord] = useState<{
+    id: string;
+    user_id: string;
+    overall_score: number;
+    head_forward: number;
+    shoulder_balance: number;
+    pelvic_tilt: number;
+    knee_alignment: number;
+    created_at: string;
+    front_image_url?: string;
+    side_image_url?: string;
   } | null>(null);
 
   const rawName = user?.user_metadata?.name;
@@ -247,8 +262,11 @@ export default function Dashboard() {
       try {
         const { getLatestAnalysisResult } = await import('@/lib/supabase');
         const result = await getLatestAnalysisResult(user.id);
-        
+
         if (result) {
+          // 전체 레코드 저장 (클릭 시 localStorage에 저장용)
+          setLatestAnalysisRecord(result);
+
           setLatestAnalysis({
             overallScore: result.overall_score,
             items: [
@@ -293,6 +311,15 @@ export default function Dashboard() {
   const completedDays = weeklyRecord.filter((r) => r.completed).length;
   const overallScore = analysisResult?.overallScore ?? 0;
   const scoreMessage = getScoreMessage(overallScore);
+
+  // 최근 분석 결과 카드 클릭 핸들러
+  const handleLatestAnalysisClick = useCallback(() => {
+    if (latestAnalysisRecord) {
+      // Supabase 레코드를 localStorage에 저장
+      localStorage.setItem('viewingRecord', JSON.stringify(latestAnalysisRecord));
+      router.push('/result?from=history');
+    }
+  }, [latestAnalysisRecord, router]);
 
   const recommendedExercises = useMemo(() => {
     if (!analysisResult) return defaultExercises;
@@ -346,8 +373,10 @@ export default function Dashboard() {
           {/* 최근 분석 결과 카드 */}
           <motion.section variants={itemVariants}>
             {analysisResult ? (
-              <Link href="/result?from=history">
-                <div className="bg-card rounded-2xl border border-border shadow-sm p-5 hover:border-blue-200 transition-all">
+              <div
+                onClick={handleLatestAnalysisClick}
+                className="bg-card rounded-2xl border border-border shadow-sm p-5 hover:border-blue-200 transition-all cursor-pointer"
+              >
                   <div className="flex items-center gap-5">
                     {/* 점수 원형 */}
                     <ScoreCircle value={overallScore} size={90} strokeWidth={8} />
@@ -384,8 +413,7 @@ export default function Dashboard() {
                     
                     <ChevronRight className="w-5 h-5 text-muted-foreground" />
                   </div>
-                </div>
-              </Link>
+              </div>
             ) : (
               <div className="bg-card rounded-2xl border border-border p-5">
                 <div className="flex items-center gap-4">

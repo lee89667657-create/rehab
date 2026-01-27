@@ -66,9 +66,14 @@ interface DiseaseDefinition {
 /**
  * 질환 정의 목록
  *
- * 현재 앱에서는 거북목/라운드숄더 2개 질환만 분석합니다.
+ * 현재 앱에서는 3개 질환을 분석합니다.
  * - forward_head: 거북목 증후군 (머리가 앞으로 나온 자세)
  * - round_shoulder: 라운드숄더 (어깨가 앞으로 말린 자세)
+ * - thoracic_kyphosis: 등굽음/흉추 후만증 (등이 과도하게 굽은 자세)
+ *
+ * 분석에 사용하는 poseAnalysis 항목:
+ * - forward_head: 거북목 거리 (cm)
+ * - shoulder_tilt: 어깨 틀어짐 (cm)
  */
 const DISEASE_DEFINITIONS: DiseaseDefinition[] = [
   {
@@ -80,8 +85,8 @@ const DISEASE_DEFINITIONS: DiseaseDefinition[] = [
     relatedParts: ['목', '어깨', '머리'],
     weights: { forward_head: 0.8, shoulder_tilt: 0.2 },
     thresholds: {
-      forward_head: { warning: 2, danger: 3.5 },
-      shoulder_tilt: { warning: 1.5, danger: 3 },
+      forward_head: { warning: 2.5, danger: 5 },
+      shoulder_tilt: { warning: 1.5, danger: 2 },
     },
   },
   {
@@ -91,10 +96,23 @@ const DISEASE_DEFINITIONS: DiseaseDefinition[] = [
     symptoms: ['어깨 통증', '등 결림', '가슴 답답함', '호흡 불편'],
     causes: ['장시간 컴퓨터 사용', '운동 부족', '가슴 근육 단축'],
     relatedParts: ['어깨', '등', '가슴'],
-    weights: { shoulder_tilt: 0.7, forward_head: 0.3 },
+    weights: { shoulder_tilt: 0.6, forward_head: 0.4 },
     thresholds: {
-      shoulder_tilt: { warning: 1.5, danger: 2.5 },
+      shoulder_tilt: { warning: 1.5, danger: 2 },
+      forward_head: { warning: 2.5, danger: 5 },
+    },
+  },
+  {
+    id: 'thoracic_kyphosis',
+    name: '등굽음 (흉추 후만증)',
+    description: '등이 앞으로 굽어 있어 교정이 필요합니다',
+    symptoms: ['등 통증', '어깨 결림', '호흡 불편'],
+    causes: ['장시간 앉은 자세', '운동 부족', '잘못된 자세 습관'],
+    relatedParts: ['등', '흉추', '어깨'],
+    weights: { forward_head: 0.5, shoulder_tilt: 0.5 },
+    thresholds: {
       forward_head: { warning: 3, danger: 5 },
+      shoulder_tilt: { warning: 1.5, danger: 2 },
     },
   },
 ];
@@ -164,6 +182,7 @@ function calculateDiseaseRisk(
     const threshold = disease.thresholds[itemId as keyof typeof disease.thresholds];
 
     if (item && threshold && weight) {
+      // 각도 기반 항목: knee_angle만 (낮을수록 위험)
       const isAngle = itemId === 'knee_angle';
       const itemRisk = calculateItemRisk(item.value, threshold, isAngle);
       totalRisk += itemRisk * weight;
@@ -205,10 +224,9 @@ export function analyzeDiseaseRisk(analysisItems: AnalysisItem[]): DiseaseRiskAn
   // 위험도 순으로 정렬
   diseases.sort((a, b) => b.risk - a.risk);
 
-  // 전체 위험도 계산 (2개 질환의 가중 평균: 거북목 50%, 라운드숄더 50%)
-  const weights = [0.5, 0.5];
+  // 전체 위험도 계산 (3개 질환의 평균)
   const overallRisk = Math.round(
-    diseases.reduce((sum, d, i) => sum + d.risk * weights[i], 0)
+    diseases.reduce((sum, d) => sum + d.risk, 0) / diseases.length
   );
 
   // 가장 우려되는 질환 (위험도 30% 이상인 경우만)
@@ -256,6 +274,9 @@ function generateRecommendations(diseases: DiseaseRisk[], overallRisk: number): 
         break;
       case 'round_shoulder':
         recommendations.push('견갑골 모으기와 라운드숄더 교정 운동을 권장합니다.');
+        break;
+      case 'thoracic_kyphosis':
+        recommendations.push('고양이-낙타 스트레칭과 등 펴기 운동을 권장합니다.');
         break;
     }
   });
