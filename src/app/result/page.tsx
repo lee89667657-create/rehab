@@ -79,6 +79,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 
+// PDF 리포트 생성
+import { downloadPDFReport, type PDFReportData } from '@/lib/pdfGenerator';
+
 // ============================================================
 // 타입 정의
 // ============================================================
@@ -1843,8 +1846,7 @@ export default function ResultPage() {
     ? (historyRecord?.overall_score ?? localHistoryRecord?.score ?? 72)
     : (analysisResult?.overallScore || 72);
 
-  // 기록 조회 시 이미지는 기록에서 가져오기 (추후 사용 예정)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // 기록 조회 시 이미지는 기록에서 가져오기
   const displayImages = useMemo(() => {
     if (isFromHistory && localHistoryRecord?.capturedImages) {
       return localHistoryRecord.capturedImages;
@@ -2115,9 +2117,47 @@ export default function ResultPage() {
     setOpenItemId(openItemId === itemId ? null : itemId);
   };
 
-  const handleDownloadPDF = useCallback(() => {
-    alert('PDF 리포트 다운로드 기능은 추후 업데이트 예정입니다.');
-  }, []);
+  const [isPDFGenerating, setIsPDFGenerating] = useState(false);
+
+  const handleDownloadPDF = useCallback(async () => {
+    if (isPDFGenerating) return;
+
+    setIsPDFGenerating(true);
+    try {
+      // 측정값 계산
+      const headItem = results.find((i) => i.id === 'forward_head');
+      const shoulderItem = results.find((i) => i.id === 'shoulder_tilt');
+      const pelvisItem = results.find((i) => i.id === 'pelvis_tilt');
+      const kneeItem = results.find((i) => i.id === 'knee_angle');
+
+      const pdfData: PDFReportData = {
+        date: new Date(),
+        overallScore: overallScore,
+        results: results,
+        jointAngles: jointAngles,
+        measurements: {
+          neckForwardDistance: headItem?.value ?? 2.5,
+          shoulderTiltAngle: shoulderItem?.value ?? 1.5,
+          hipTiltAngle: pelvisItem?.value ?? 1.0,
+          kneeTiltAngle: kneeItem?.value ?? 1.0,
+        },
+        postureType: {
+          name: overallScore >= 80 ? '양호한 자세' : overallScore >= 60 ? '주의 필요' : '교정 필요',
+          description: overallScore >= 80 ? '전반적으로 좋은 자세입니다.' : '일부 교정이 필요합니다.',
+          features: results.filter(r => r.grade !== 'good').map(r => r.name),
+        },
+        recommendedPrograms: exerciseRecommendation.recommendedPrograms,
+        capturedImages: displayImages,
+      };
+
+      await downloadPDFReport(pdfData);
+    } catch (error) {
+      console.error('PDF 생성 실패:', error);
+      alert('PDF 생성에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsPDFGenerating(false);
+    }
+  }, [isPDFGenerating, results, overallScore, jointAngles, exerciseRecommendation, displayImages]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _normalCount = results.filter((item) => item.grade === 'good').length;
