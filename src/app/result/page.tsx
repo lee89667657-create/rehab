@@ -25,6 +25,7 @@ import {
   HeartPulse,
   Clock,
   Lightbulb,
+  CheckCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAnalysisResult, useCapturedImages, useJointAngles, useLandmarks } from '@/store/useStore';
@@ -81,6 +82,18 @@ import { Progress } from '@/components/ui/progress';
 
 // PDF 리포트 생성
 import { downloadPDFReport, type PDFReportData } from '@/lib/pdfGenerator';
+
+// 근육 매핑 데이터
+import {
+  SIDE_MUSCLES,
+  FRONT_MUSCLES,
+  OVERLAY_COLORS,
+  getPostureProblems,
+  getMusclesByProblems,
+  getMuscleListText,
+  type MuscleData,
+  type PostureProblems
+} from '@/lib/muscleMapping';
 
 // ============================================================
 // 타입 정의
@@ -1711,6 +1724,323 @@ function PostureTypeDiagnosisCard({ score, results, measurements }: PostureTypeD
 }
 
 // ============================================================
+// 근육 불균형 분석 컴포넌트 (동적 필터링)
+// ============================================================
+
+interface SimpleMuscleAnalysisProps {
+  postureProblems: PostureProblems;
+}
+
+function SimpleMuscleAnalysis({ postureProblems }: SimpleMuscleAnalysisProps) {
+  // 자세 문제에 따른 근육 필터링
+  const frontMuscles = getMusclesByProblems(postureProblems, 'front');
+  const sideMuscles = getMusclesByProblems(postureProblems, 'side');
+
+  // 표시할 근육 리스트 텍스트
+  const frontShortenedList = getMuscleListText(frontMuscles.shortened);
+  const frontWeakenedList = getMuscleListText(frontMuscles.weakened);
+  const sideShortenedList = getMuscleListText(sideMuscles.shortened);
+  const sideWeakenedList = getMuscleListText(sideMuscles.weakened);
+
+  // 문제가 없으면 섹션 숨김
+  const hasAnyProblem = postureProblems.hasTurtleNeck || postureProblems.hasRoundShoulder || postureProblems.hasKyphosis;
+  const showFrontSection = postureProblems.hasRoundShoulder; // 정면은 라운드숄더일 때만
+  const showSideSection = hasAnyProblem; // 측면은 어떤 문제든 있으면
+
+  if (!hasAnyProblem) {
+    return (
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-border bg-muted/30">
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Activity className="w-4 h-4 text-primary" />
+            근육 불균형 분석
+          </h3>
+        </div>
+        <div className="p-6 text-center">
+          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-green-500/20 flex items-center justify-center">
+            <CheckCircle className="w-6 h-6 text-green-400" />
+          </div>
+          <p className="text-sm text-muted-foreground">자세 분석 결과 특별한 근육 불균형이 발견되지 않았습니다.</p>
+          <p className="text-xs text-muted-foreground mt-1">현재 자세를 잘 유지해주세요!</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
+      {/* 헤더 */}
+      <div className="px-4 py-3 border-b border-border bg-muted/30">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <Activity className="w-4 h-4 text-primary" />
+          근육 불균형 분석
+        </h3>
+      </div>
+
+      <div className="p-4 space-y-6">
+        {/* ==================== 정면 섹션 (라운드숄더일 때만) ==================== */}
+        {showFrontSection && (
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+              정면 · FRONT VIEW
+            </p>
+
+            <div className="flex gap-4">
+              {/* 왼쪽: 정면 근육 이미지 + 오버레이 */}
+              <div
+                className="relative rounded-xl overflow-hidden border border-border/50 flex-shrink-0 bg-gradient-to-b from-slate-800 to-slate-900"
+                style={{ width: '180px', height: '400px' }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/muscle_front.png"
+                  alt="정면 근육"
+                  className="absolute inset-0 w-full h-full object-contain"
+                  style={{ filter: 'brightness(0.85) contrast(1.05)' }}
+                />
+
+                {/* 단축 위험 오버레이 (빨강) - 동적 */}
+                {frontMuscles.shortened.map((muscle: MuscleData) => (
+                  <div
+                    key={muscle.id}
+                    className="absolute rounded-full animate-pulse cursor-pointer group"
+                    style={{
+                      left: `${muscle.x}%`,
+                      top: `${muscle.y}%`,
+                      width: `${muscle.size}px`,
+                      height: `${muscle.size}px`,
+                      transform: 'translate(-50%, -50%)',
+                      backgroundColor: OVERLAY_COLORS.shortened.fill,
+                      border: `2px solid ${OVERLAY_COLORS.shortened.border}`,
+                    }}
+                    title={`${muscle.name} (${muscle.position})`}
+                  />
+                ))}
+
+                {/* 약화 위험 오버레이 (파랑) - 동적 */}
+                {frontMuscles.weakened.map((muscle: MuscleData) => (
+                  <div
+                    key={muscle.id}
+                    className="absolute rounded-full animate-pulse cursor-pointer group"
+                    style={{
+                      left: `${muscle.x}%`,
+                      top: `${muscle.y}%`,
+                      width: `${muscle.size}px`,
+                      height: `${muscle.size}px`,
+                      transform: 'translate(-50%, -50%)',
+                      backgroundColor: OVERLAY_COLORS.weakened.fill,
+                      border: `2px solid ${OVERLAY_COLORS.weakened.border}`,
+                    }}
+                    title={`${muscle.name} (${muscle.position})`}
+                  />
+                ))}
+              </div>
+
+              {/* 오른쪽: 근육 분석 카드 (세로 배치) */}
+              <div className="flex-1 flex flex-col gap-2.5">
+                {/* 단축 위험 근육 카드 */}
+                {frontShortenedList.length > 0 && (
+                  <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-rose-500/20">
+                        <AlertTriangle className="w-4 h-4 text-rose-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-foreground">단축 위험 근육</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-rose-500/20 text-rose-400">
+                            스트레칭 필요
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mb-2">
+                          짧아지고 긴장된 근육들입니다.
+                        </p>
+                        <ul className="space-y-1">
+                          {frontShortenedList.map((muscle, idx) => (
+                            <li key={idx} className="flex items-center gap-2 text-xs text-slate-300">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                              {muscle}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 약화 위험 근육 카드 */}
+                {frontWeakenedList.length > 0 && (
+                  <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-500/20">
+                        <AlertTriangle className="w-4 h-4 text-blue-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-foreground">약화 위험 근육</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-blue-500/20 text-blue-400">
+                            강화 필요
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mb-2">
+                          늘어나고 약해진 근육들입니다.
+                        </p>
+                        <ul className="space-y-1">
+                          {frontWeakenedList.map((muscle, idx) => (
+                            <li key={idx} className="flex items-center gap-2 text-xs text-slate-300">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                              {muscle}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== 측면 섹션 ==================== */}
+        {showSideSection && (
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+              측면 · SIDE VIEW
+            </p>
+
+            <div className="flex gap-4">
+              {/* 왼쪽: 측면 근육 이미지 + 오버레이 */}
+              <div
+                className="relative rounded-xl overflow-hidden border border-border/50 flex-shrink-0 bg-gradient-to-b from-slate-800 to-slate-900"
+                style={{ width: '180px', height: '400px' }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/muscle_side.png"
+                  alt="측면 근육"
+                  className="absolute inset-0 w-full h-full object-contain"
+                  style={{ filter: 'brightness(0.85) contrast(1.05)' }}
+                />
+
+                {/* 단축 위험 (빨강) - 동적 필터링 */}
+                {sideMuscles.shortened.map((muscle: MuscleData) => (
+                  <div
+                    key={muscle.id}
+                    className="absolute rounded-full animate-pulse cursor-pointer group"
+                    style={{
+                      left: `${muscle.x}%`,
+                      top: `${muscle.y}%`,
+                      width: `${muscle.size}px`,
+                      height: `${muscle.size}px`,
+                      transform: 'translate(-50%, -50%)',
+                      backgroundColor: OVERLAY_COLORS.shortened.fill,
+                      border: `2px solid ${OVERLAY_COLORS.shortened.border}`,
+                    }}
+                    title={`${muscle.name} (${muscle.position})`}
+                  >
+                    <span className="absolute left-full ml-1 top-1/2 -translate-y-1/2 bg-red-500 text-white text-[9px] px-1 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                      {muscle.name}
+                    </span>
+                  </div>
+                ))}
+
+                {/* 약화 위험 (파랑) - 동적 필터링 */}
+                {sideMuscles.weakened.map((muscle: MuscleData) => (
+                  <div
+                    key={muscle.id}
+                    className="absolute rounded-full animate-pulse cursor-pointer group"
+                    style={{
+                      left: `${muscle.x}%`,
+                      top: `${muscle.y}%`,
+                      width: `${muscle.size}px`,
+                      height: `${muscle.size}px`,
+                      transform: 'translate(-50%, -50%)',
+                      backgroundColor: OVERLAY_COLORS.weakened.fill,
+                      border: `2px solid ${OVERLAY_COLORS.weakened.border}`,
+                    }}
+                    title={`${muscle.name} (${muscle.position})`}
+                  >
+                    <span className="absolute left-full ml-1 top-1/2 -translate-y-1/2 bg-blue-500 text-white text-[9px] px-1 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                      {muscle.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* 오른쪽: 근육 분석 카드 (세로 배치) */}
+              <div className="flex-1 flex flex-col gap-2.5">
+                {/* 단축 위험 근육 카드 */}
+                {sideShortenedList.length > 0 && (
+                  <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-rose-500/20">
+                        <AlertTriangle className="w-4 h-4 text-rose-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-foreground">단축 위험 근육</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-rose-500/20 text-rose-400">
+                            스트레칭 필요
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mb-2">
+                          짧아지고 긴장된 근육들입니다.
+                        </p>
+                        <ul className="space-y-1">
+                          {sideShortenedList.map((muscle, idx) => (
+                            <li key={idx} className="flex items-center gap-2 text-xs text-slate-300">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                              {muscle}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 약화 위험 근육 카드 */}
+                {sideWeakenedList.length > 0 && (
+                  <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-500/20">
+                        <AlertTriangle className="w-4 h-4 text-blue-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-foreground">약화 위험 근육</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-blue-500/20 text-blue-400">
+                            강화 필요
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mb-2">
+                          늘어나고 약해진 근육들입니다.
+                        </p>
+                        <ul className="space-y-1">
+                          {sideWeakenedList.map((muscle, idx) => (
+                            <li key={idx} className="flex items-center gap-2 text-xs text-slate-300">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                              {muscle}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // 메인 컴포넌트: ResultPage
 // ============================================================
 
@@ -1845,6 +2175,25 @@ export default function ResultPage() {
   const overallScore = isFromHistory
     ? (historyRecord?.overall_score ?? localHistoryRecord?.score ?? 72)
     : (analysisResult?.overallScore || 72);
+
+  // 자세 문제 판정 (근육 불균형 분석용)
+  // 상단 태그("주의", "위험")와 동일한 기준 사용: grade가 'warning' 또는 'danger'이면 문제로 판정
+  const postureProblems = useMemo<PostureProblems>(() => {
+    const forwardHeadItem = results.find(r => r.id === 'forward_head');
+    const shoulderItem = results.find(r => r.id === 'shoulder_tilt');
+
+    // grade가 'warning' 또는 'danger'이면 문제가 있는 것으로 판정
+    const hasTurtleNeck = forwardHeadItem?.grade === 'warning' || forwardHeadItem?.grade === 'danger';
+    const hasRoundShoulder = shoulderItem?.grade === 'warning' || shoulderItem?.grade === 'danger';
+    // 등굽음은 거북목과 라운드숄더가 모두 있을 때 표시 (복합 문제)
+    const hasKyphosis = hasTurtleNeck && hasRoundShoulder;
+
+    return {
+      hasTurtleNeck: hasTurtleNeck || false,
+      hasRoundShoulder: hasRoundShoulder || false,
+      hasKyphosis: hasKyphosis || false,
+    };
+  }, [results]);
 
   // 기록 조회 시 이미지는 기록에서 가져오기
   const displayImages = useMemo(() => {
@@ -2253,6 +2602,13 @@ export default function ResultPage() {
               />
             </motion.section>
           )}
+
+          {/* ============================================================ */}
+          {/* 근육 불균형 분석 */}
+          {/* ============================================================ */}
+          <motion.section variants={itemVariants}>
+            <SimpleMuscleAnalysis postureProblems={postureProblems} />
+          </motion.section>
 
           {/* ============================================================ */}
           {/* 측정 항목 정의 테이블 */}
